@@ -1,5 +1,5 @@
 // FILE: pages/api/backtest.js
-// Fetches 30 days daily data from Yahoo Finance and runs prediction engine
+// Fetches 30 days daily data fromYahoo Finance and runs prediction engine
 
 function ema(data, period) {
   var k = 2 / (period + 1), e = data[0];
