@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const NSE_STOCKS = [
   {n:"Reliance Industries",s:"RELIANCE",sec:"Energy"},
