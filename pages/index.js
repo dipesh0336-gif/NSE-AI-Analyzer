@@ -227,7 +227,7 @@ function supportResistance(highs, lows, closes, current) {
 // ── ENHANCED VERDICT ENGINE ────────────────────────────────────────────
 // 15 indicators, score -2 to +2 each, total range -30 to +30
 // Only triggers LONG/SHORT when score > threshold (high confidence filter)
-function generateVerdict(sig, ext, rawData) {
+function generateVerdict(sig, ext, rawData, niftyTrend) {
   var score=0;
   var bullSignals=[], bearSignals=[], neutralSignals=[];
   var opens=rawData.opens, highs=rawData.highs, lows=rawData.lows;
@@ -335,6 +335,29 @@ function generateVerdict(sig, ext, rawData) {
   else if(ext.vix<13){score=Math.round(score*1.1);bullSignals.push('VIX '+ext.vix.toFixed(1)+' calm market - favorable conditions');}
   else neutralSignals.push('VIX '+ext.vix.toFixed(1)+' normal');
 
+  // ── NIFTY MARKET FILTER ───────────────────────────────────────────
+  // Most powerful filter: only trade WITH the market direction
+  if(niftyTrend) {
+    if(niftyTrend.trend==='BULLISH') {
+      score+=3;
+      bullSignals.push('Nifty BULLISH (score '+niftyTrend.score+') - market tailwind for longs');
+    } else if(niftyTrend.trend==='BEARISH') {
+      score-=3;
+      bearSignals.push('Nifty BEARISH (score '+niftyTrend.score+') - market headwind for longs');
+    } else {
+      neutralSignals.push('Nifty NEUTRAL - no market tailwind');
+    }
+    // Hard veto: never go long in strongly bearish Nifty or short in strongly bullish
+    if(niftyTrend.score<=-6 && score>0) {
+      score=Math.min(score, 3); // cap bullish score when Nifty strongly bearish
+      bearSignals.push('NIFTY VETO: Strong bearish market overrides bullish signal');
+    }
+    if(niftyTrend.score>=6 && score<0) {
+      score=Math.max(score, -3); // cap bearish score when Nifty strongly bullish
+      bullSignals.push('NIFTY VETO: Strong bullish market overrides bearish signal');
+    }
+  }
+
   // ── 14. EMA200 Long-term trend (if enough data) ────────────────
   if(closes.length>=50){
     var ema50=ema(closes,50);
@@ -403,7 +426,7 @@ function generateVerdict(sig, ext, rawData) {
     {name:'PCR',val:ext.pcr.toFixed(2),bull:ext.pcr>1.2,bear:ext.pcr<0.8},
   ];
 
-  return{verdict:verdict,confidence:confidence,score:score,maxScore:30,entry:entry,stopLoss:stopLoss,target:target,summary:summary,signals:signals,bullCount:bullSignals.length,bearCount:bearSignals.length};
+  return{verdict:verdict,confidence:confidence,score:score,maxScore:30,entry:entry,stopLoss:stopLoss,target:target,summary:summary,signals:signals,bullCount:bullSignals.length,bearCount:bearSignals.length,niftyTrend:niftyTrend};
 }
 
 function StockSearch(props){
@@ -520,8 +543,8 @@ export default function Home(){
       if(!mr.ok||mj.error)throw new Error(mj.error||'Data fetch failed');
       setMdata(mj.data);setSig(mj.signals);
       var ex=calcExt(symbol,mj.signals.last);setExt(ex);
-      setStep('Running 15-indicator engine...');
-      var v=generateVerdict(mj.signals,ex,mj.data);
+      setStep('Running 15-indicator engine + Nifty filter...');
+      var v=generateVerdict(mj.signals,ex,mj.data,mj.niftyTrend);
       setVerdict(v);
     }catch(e){setErr(e.message);}
     setLoading(false);
@@ -651,6 +674,11 @@ export default function Home(){
             React.createElement('div',{style:{fontSize:10,fontWeight:700,color:G,lineHeight:1.4}},verdict.target)
           )
         ),
+        verdict.niftyTrend?React.createElement('div',{style:{background:'rgba(0,0,0,0.25)',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}},
+          React.createElement('div',{style:{fontSize:9,color:'#8899bb',textTransform:'uppercase',flexShrink:0}},'NIFTY 50'),
+          React.createElement('div',{style:{fontSize:11,fontWeight:700,color:verdict.niftyTrend.trend==='BULLISH'?G:verdict.niftyTrend.trend==='BEARISH'?R:A,flexShrink:0,marginRight:4}},verdict.niftyTrend.trend),
+          React.createElement('div',{style:{fontSize:10,color:'#8899bb',lineHeight:1.4}},verdict.niftyTrend.reason)
+        ):null,
         React.createElement('div',{style:{fontSize:11,color:'#c0ccdd',lineHeight:1.75,borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:8,marginBottom:10}},verdict.summary),
         React.createElement('div',null,
           React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:5}},'12-Signal Scorecard'),
