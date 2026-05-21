@@ -152,6 +152,40 @@ function predictEnhanced(opens, highs, lows, closes, volumes) {
   return'NEUTRAL';
 }
 
+function getNiftyScore(nOpens, nHighs, nLows, nCloses, nVolumes) {
+  if(nCloses.length<21)return 0;
+  var last=nCloses[nCloses.length-1];
+  var e9=ema(nCloses,9), e21=ema(nCloses,21);
+  var rsiV=rsi(nCloses);
+  var macdD=macdCalc(nCloses);
+  var vwapV=vwapCalc(nHighs,nLows,nCloses,nVolumes);
+  var mom5=nCloses.length>5?((last-nCloses[nCloses.length-6])/nCloses[nCloses.length-6])*100:0;
+  var changePct=((last-(nCloses[nCloses.length-2]||last))/(nCloses[nCloses.length-2]||last))*100;
+  var s=0;
+  if(e9[e9.length-1]>e21[e21.length-1])s+=2;else s-=2;
+  if(macdD.hist>0)s+=2;else s-=2;
+  if(last>vwapV)s+=1;else s-=1;
+  if(rsiV>52)s+=1;else if(rsiV<48)s-=1;
+  if(mom5>0.3)s+=1;else if(mom5<-0.3)s-=1;
+  if(changePct>0.2)s+=1;else if(changePct<-0.2)s-=1;
+  return s;
+}
+
+function predictWithNiftyFilter(opens, highs, lows, closes, volumes, nOpens, nHighs, nLows, nCloses, nVolumes) {
+  var prediction = predictEnhanced(opens, highs, lows, closes, volumes);
+  if(prediction === 'NEUTRAL') return 'NEUTRAL';
+  
+  // Get Nifty market direction
+  var niftyScore = getNiftyScore(nOpens, nHighs, nLows, nCloses, nVolumes);
+  
+  // Hard veto: don't go long when Nifty strongly bearish
+  if(prediction === 'LONG' && niftyScore <= -4) return 'NEUTRAL';
+  // Hard veto: don't go short when Nifty strongly bullish  
+  if(prediction === 'SHORT' && niftyScore >= 4) return 'NEUTRAL';
+  
+  return prediction;
+}
+
 export default async function handler(req, res) {
   var symbol=req.query.symbol, type=req.query.type||'stock';
   if(!symbol)return res.status(400).json({error:'Symbol required'});
@@ -165,31 +199,50 @@ export default async function handler(req, res) {
   }
 
   try{
-    var url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(yhSymbol)+'?interval=1d&range=6mo';
-    var r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'application/json','Referer':'https://finance.yahoo.com'}});
-    if(!r.ok)throw new Error('Yahoo Finance error: '+r.status);
-    var json=await r.json();
-    var result=json.chart&&json.chart.result&&json.chart.result[0];
-    if(!result)throw new Error('No data returned');
+    async function fetchData(sym) {
+      var url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=6mo';
+      var r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'application/json','Referer':'https://finance.yahoo.com'}});
+      if(!r.ok)throw new Error('Yahoo Finance error '+r.status+' for '+sym);
+      var json=await r.json();
+      var result=json.chart&&json.chart.result&&json.chart.result[0];
+      if(!result)throw new Error('No data for '+sym);
+      var ts=result.timestamps||result.timestamp;
+      var q=result.indicators.quote[0];
+      var vi=ts.map(function(_,i){return i;}).filter(function(i){return q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null&&q.low[i]!=null;});
+      return{timestamps:vi.map(function(i){return ts[i];}),opens:vi.map(function(i){return q.open[i];}),highs:vi.map(function(i){return q.high[i];}),lows:vi.map(function(i){return q.low[i];}),closes:vi.map(function(i){return q.close[i];}),volumes:vi.map(function(i){return q.volume[i]||0;})};
+    }
 
-    var ts=result.timestamps||result.timestamp;
-    var q=result.indicators.quote[0];
-    var validIdx=ts.map(function(_,i){return i;}).filter(function(i){return q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null&&q.low[i]!=null;});
-    if(validIdx.length<35)throw new Error('Not enough historical data. Need at least 35 trading days.');
+    var isNifty=(symbol==='NIFTY'&&type==='index');
+    var fetches=[fetchData(yhSymbol)];
+    if(!isNifty)fetches.push(fetchData('^NSEI'));
+    var fetchResults=await Promise.all(fetches);
+    var instrData=fetchResults[0];
+    var niftyDataFull=isNifty?instrData:fetchResults[1];
 
-    var allOpens  =validIdx.map(function(i){return q.open[i];});
-    var allHighs  =validIdx.map(function(i){return q.high[i];});
-    var allLows   =validIdx.map(function(i){return q.low[i];});
-    var allCloses =validIdx.map(function(i){return q.close[i];});
-    var allVolumes=validIdx.map(function(i){return q.volume[i]||0;});
-    var allDates  =validIdx.map(function(i){var d=new Date(ts[i]*1000);return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});});
+    if(instrData.closes.length<35)throw new Error('Not enough historical data. Need at least 35 trading days.');
+
+    var allOpens  =instrData.opens;
+    var allHighs  =instrData.highs;
+    var allLows   =instrData.lows;
+    var allCloses =instrData.closes;
+    var allVolumes=instrData.volumes;
+    var allDates  =instrData.timestamps.map(function(t){var d=new Date(t*1000);return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});});
+
+    var nAllOpens  =niftyDataFull.opens;
+    var nAllHighs  =niftyDataFull.highs;
+    var nAllLows   =niftyDataFull.lows;
+    var nAllCloses =niftyDataFull.closes;
+    var nAllVolumes=niftyDataFull.volumes;
 
     var results=[];
     var startIdx=Math.max(30,allCloses.length-32);
 
     for(var i=startIdx;i<allCloses.length-1;i++){
       var hC=allCloses.slice(0,i+1),hH=allHighs.slice(0,i+1),hL=allLows.slice(0,i+1),hO=allOpens.slice(0,i+1),hV=allVolumes.slice(0,i+1);
-      var prediction=predictEnhanced(hO,hH,hL,hC,hV);
+      // Get corresponding Nifty history up to same date
+      var nLen=Math.min(i+1,nAllCloses.length);
+      var nhC=nAllCloses.slice(0,nLen),nhH=nAllHighs.slice(0,nLen),nhL=nAllLows.slice(0,nLen),nhO=nAllOpens.slice(0,nLen),nhV=nAllVolumes.slice(0,nLen);
+      var prediction=predictWithNiftyFilter(hO,hH,hL,hC,hV,nhO,nhH,nhL,nhC,nhV);
       var currentClose=allCloses[i], nextClose=allCloses[i+1];
       var actualMove=nextClose>currentClose?'UP':nextClose<currentClose?'DOWN':'FLAT';
       var changePct=((nextClose-currentClose)/currentClose)*100;
