@@ -132,7 +132,7 @@ function predictBar(opens, highs, lows, closes, volumes) {
 async function fetchIntraday(symbol, interval) {
   var intervalMap={'15min':'15m','5min':'5m','30min':'30m','1h':'60m'};
   var yhInterval=intervalMap[interval]||'15m';
-  var range=yhInterval==='5m'?'5d':'60d';
+  var range=yhInterval==='5m'?'10d':yhInterval==='15m'?'60d':'60d';
   var url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?interval='+yhInterval+'&range='+range;
   var r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'application/json','Referer':'https://finance.yahoo.com'}});
   if(!r.ok)throw new Error('Yahoo Finance error '+r.status);
@@ -188,7 +188,7 @@ export default async function handler(req, res) {
     var minMovePct=Math.max(0.04, avgBarMove*0.3);
 
     var results=[];
-    var startIdx=Math.max(30, d.closes.length-120); // last 120 bars max
+    var startIdx=Math.max(30, d.closes.length-200); // last 200 bars max
 
     for(var i=startIdx;i<d.closes.length-1;i++){
       var hC=d.closes.slice(0,i+1),hH=d.highs.slice(0,i+1),hL=d.lows.slice(0,i+1),hO=d.opens.slice(0,i+1),hV=d.volumes.slice(0,i+1);
@@ -242,7 +242,7 @@ export default async function handler(req, res) {
     }
 
     // Only use last 60 bars for display
-    var displayResults=results.slice(-60);
+    var displayResults=results.slice(-100);
     var directional=displayResults.filter(function(r){return r.prediction!=='NEUTRAL'&&r.actualMove!=='FLAT';});
     var correct=directional.filter(function(r){return r.correct===true;});
     var accuracy=directional.length>0?Math.round(correct.length/directional.length*100):0;
