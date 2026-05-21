@@ -125,7 +125,7 @@ function predictBar(opens, highs, lows, closes, volumes) {
   // EMA50
   if(closes.length>=50){var e50=ema(closes,50);if(last>e50[e50.length-1])score+=1;else score-=1;}
 
-  var signal=score>=7?'LONG':score<=-7?'SHORT':'NEUTRAL';
+  var signal=score>=5?'LONG':score<=-5?'SHORT':'NEUTRAL';
   return{signal:signal,score:score};
 }
 
@@ -178,7 +178,14 @@ export default async function handler(req, res) {
     // Minimum move threshold to count as real signal
     // Filters out noise - only count moves above this as directional
     var avgPrice=d.closes.reduce(function(a,b){return a+b;},0)/d.closes.length;
-    var minMovePct=0.15; // 0.15% minimum move to count
+    // Dynamic noise filter: based on actual average bar size
+    var avgBarMove=0;
+    for(var bi=1;bi<Math.min(d.closes.length,30);bi++){
+      avgBarMove+=Math.abs((d.closes[bi]-d.closes[bi-1])/d.closes[bi-1])*100;
+    }
+    avgBarMove=avgBarMove/Math.min(d.closes.length-1,29);
+    // Only count moves larger than 30% of average bar size (filters noise, keeps signal)
+    var minMovePct=Math.max(0.04, avgBarMove*0.3);
 
     var results=[];
     var startIdx=Math.max(30, d.closes.length-120); // last 120 bars max
@@ -261,7 +268,7 @@ export default async function handler(req, res) {
       shortAccuracy:shortDir.length>0?Math.round(shortCorrect.length/shortDir.length*100):0,
       neutralRate:Math.round(neutrals.length/displayResults.length*100),
       minMovePct:minMovePct,
-      note:'Intraday backtest: each signal checked against NEXT BAR direction. Moves < '+minMovePct+'% counted as FLAT and excluded.',
+      note:'Intraday backtest on '+interval+' bars. Each signal vs next bar direction. Moves < '+minMovePct.toFixed(3)+'% (avg bar: '+avgBarMove.toFixed(3)+'%) counted as noise/FLAT.',
       results:displayResults.slice(-40)
     });
 
