@@ -380,16 +380,16 @@ function generateVerdict(sig, ext, rawData, niftyTrend) {
   var verdict,confidence,entry,stopLoss,target,summary,minScore;
 
   // Stricter thresholds = fewer trades but higher quality
-  if(score>=7){
+  if(score>=5){
     verdict='LONG';
-    confidence=score>=10?'HIGH':'MEDIUM';
+    confidence=score>=8?'HIGH':'MEDIUM';
     entry='Rs '+price.toFixed(1)+' - Rs '+(price+atr*0.15).toFixed(1);
     stopLoss='Rs '+(price-atr*0.4).toFixed(1);
     target='Rs '+(price+atr*1.0).toFixed(1)+' / Rs '+(price+atr*1.8).toFixed(1);
     summary=bullSignals.slice(0,4).join('. ')+'.'+(bearSignals.length?'\nWatch: '+bearSignals[0]+'.':'');
-  } else if(score<=-7){
+  } else if(score<=-5){
     verdict='SHORT';
-    confidence=score<=-10?'HIGH':'MEDIUM';
+    confidence=score<=-8?'HIGH':'MEDIUM';
     entry='Rs '+price.toFixed(1)+' - Rs '+(price-atr*0.15).toFixed(1);
     stopLoss='Rs '+(price+atr*0.4).toFixed(1);
     target='Rs '+(price-atr*1.0).toFixed(1)+' / Rs '+(price-atr*1.8).toFixed(1);
@@ -556,7 +556,7 @@ export default function Home(){
     if(!symbol){setBtErr('Please select an instrument in the Analyze tab first.');return;}
     setBtLoading(true);setBtErr('');setBtResult(null);
     try{
-      var r=await fetch('/api/backtest?symbol='+encodeURIComponent(symbol)+'&type='+itype);
+      var r=await fetch('/api/backtest?symbol='+encodeURIComponent(symbol)+'&type='+itype+'&interval='+intv);
       var j=await r.json();
       if(!r.ok||j.error)throw new Error(j.error||'Backtest failed');
       setBtResult(j);
