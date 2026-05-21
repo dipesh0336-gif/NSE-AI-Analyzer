@@ -728,7 +728,7 @@ export default function Home(){
               React.createElement('div',{style:{fontSize:10,color:'#8899bb'}},btResult.correctCalls+' correct / '+btResult.directionalCalls+' directional calls')
             ),
             React.createElement('div',{style:{textAlign:'right'}},
-              React.createElement('div',{style:{fontSize:11,color:'#8899bb',marginBottom:3}},'Days tested: '+btResult.totalDays),
+              React.createElement('div',{style:{fontSize:11,color:'#8899bb',marginBottom:3}},'Bars tested: '+btResult.totalBars+' ('+btResult.interval+')'),
               React.createElement('div',{style:{fontSize:11,color:G,marginBottom:2}},'LONG: '+btResult.longCalls),
               React.createElement('div',{style:{fontSize:11,color:R,marginBottom:2}},'SHORT: '+btResult.shortCalls),
               React.createElement('div',{style:{fontSize:11,color:A}},'NEUTRAL: '+btResult.neutralCalls)
@@ -739,7 +739,7 @@ export default function Home(){
           React.createElement(AccuracyBar,{pct:btResult.shortAccuracy,label:'SHORT Accuracy',sub:btResult.shortCalls+' short calls'})
         ),
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:14,marginBottom:10}},
-          React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:10}},'Day-by-Day Results'),
+          React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:10}},'Bar-by-Bar Results ('+btResult.interval+' intervals)'),
           React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:11}},
             React.createElement('thead',null,
               React.createElement('tr',null,
@@ -765,7 +765,7 @@ export default function Home(){
             )
           )
         ),
-        React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8,padding:'4px 0'}},'Backtest on daily data. Neutral calls excluded from accuracy. Higher neutral rate = more selective = better quality trades. Always use stop losses.')
+        React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8,padding:'4px 0'}},btResult.note||'Intraday backtest. Each signal tested against the next bar. FLAT moves excluded.')
       ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select an instrument above and tap RUN 30-DAY BACKTEST to measure prediction accuracy over last 30 trading days.')
     ):null
   );
