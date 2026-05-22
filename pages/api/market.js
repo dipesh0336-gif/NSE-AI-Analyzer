@@ -1,161 +1,219 @@
 // FILE: pages/api/market.js
-// Returns market data + Nifty trend as market filter
+// ORB + Previous Day Levels strategy
+// Fetches daily + intraday in parallel, computes PDH/PDL/PDC/CPR/OR/VWAP
 
-function ema(data, p) {
-  var k=2/(p+1), e=data[0];
-  return data.map(function(v,i){if(i===0)return e;e=v*k+e*(1-k);return e;});
-}
-function rsi(closes, p) {
-  if(!p)p=14;
-  if(closes.length<p+1)return 50;
-  var g=0,l=0;
-  for(var i=1;i<=p;i++){var d=closes[i]-closes[i-1];if(d>0)g+=d;else l-=d;}
-  var ag=g/p,al=l/p;
-  for(var i=p+1;i<closes.length;i++){var d=closes[i]-closes[i-1];ag=(ag*(p-1)+(d>0?d:0))/p;al=(al*(p-1)+(d<0?-d:0))/p;}
-  return al===0?100:100-(100/(1+ag/al));
-}
-function macdCalc(closes) {
-  var e12=ema(closes,12),e26=ema(closes,26);
-  var line=e12.map(function(v,i){return v-e26[i];});
-  var signal=ema(line.slice(26),9);
-  return{hist:line[line.length-1]-signal[signal.length-1],line:line[line.length-1],signal:signal[signal.length-1]};
-}
-function vwapCalc(highs,lows,closes,volumes){
-  var ct=0,cv=0;
-  for(var i=0;i<closes.length;i++){var tp=(highs[i]+lows[i]+closes[i])/3;ct+=tp*volumes[i];cv+=volumes[i];}
-  return cv>0?ct/cv:closes[closes.length-1];
-}
+const HDRS = {
+  'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Accept':'application/json','Referer':'https://finance.yahoo.com',
+};
 
-async function fetchYahoo(symbol, interval, range) {
-  var yhInterval=interval;
-  if(interval==='15min')yhInterval='15m';
-  else if(interval==='5min')yhInterval='5m';
-  else if(interval==='30min')yhInterval='30m';
-  else if(interval==='1h')yhInterval='60m';
-  if(!range)range=yhInterval==='5m'?'2d':'5d';
-
-  var url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?interval='+yhInterval+'&range='+range;
-  var r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36','Accept':'application/json','Referer':'https://finance.yahoo.com'}});
-  if(!r.ok)throw new Error('Yahoo Finance returned '+r.status);
-  var json=await r.json();
-  var result=json.chart&&json.chart.result&&json.chart.result[0];
-  if(!result)throw new Error('No data returned for '+symbol);
-  var ts=result.timestamps||result.timestamp;
-  var q=result.indicators.quote[0];
-  var validIdx=ts.map(function(_,i){return i;}).filter(function(i){return q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null&&q.low[i]!=null;});
-  return{
-    timestamps:validIdx.map(function(i){return ts[i];}),
-    opens:validIdx.map(function(i){return q.open[i];}),
-    highs:validIdx.map(function(i){return q.high[i];}),
-    lows:validIdx.map(function(i){return q.low[i];}),
-    closes:validIdx.map(function(i){return q.close[i];}),
-    volumes:validIdx.map(function(i){return q.volume[i]||0;}),
+async function fetchYahoo(sym, interval, range) {
+  const iMap = {'15min':'15m','5min':'5m','30min':'30m','1h':'60m'};
+  const yh = iMap[interval] || '15m';
+  const r = await fetch(
+    'https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval='+yh+'&range='+(range||'1d'),
+    { headers: HDRS }
+  );
+  if (!r.ok) throw new Error('Yahoo Finance '+r.status+' for '+sym);
+  const j = await r.json();
+  const res = j?.chart?.result?.[0];
+  if (!res) throw new Error('No data for '+sym);
+  const ts = res.timestamps || res.timestamp;
+  const q = res.indicators.quote[0];
+  const vi = ts.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null&&q.low[i]!=null);
+  return {
+    ts: vi.map(i=>ts[i]), opens: vi.map(i=>q.open[i]), highs: vi.map(i=>q.high[i]),
+    lows: vi.map(i=>q.low[i]), closes: vi.map(i=>q.close[i]), volumes: vi.map(i=>q.volume[i]||0),
   };
 }
 
-function computeSignals(data) {
-  var closes=data.closes, highs=data.highs, lows=data.lows, volumes=data.volumes;
-  var last=closes[closes.length-1], prev=closes[closes.length-2];
-  var change=last-prev, changePct=(change/prev)*100;
-  var dayN=Math.min(closes.length,78);
-  var dayHigh=Math.max.apply(null,highs.slice(-dayN));
-  var dayLow=Math.min.apply(null,lows.slice(-dayN));
-  var e9=ema(closes,9), e21=ema(closes,21);
-  var rsiVal=rsi(closes), macdData=macdCalc(closes), vwapVal=vwapCalc(highs,lows,closes,volumes);
-  var avgVol=volumes.slice(-20).reduce(function(a,b){return a+b;},0)/20;
-  var lastVol=volumes[volumes.length-1];
-  var volRatio=avgVol>0?lastVol/avgVol:1;
-  var mom10=closes.length>10?((last-closes[closes.length-11])/closes[closes.length-11])*100:0;
-  return{
-    last:last,prev:prev,change:change,changePct:changePct,dayHigh:dayHigh,dayLow:dayLow,
-    ema9:e9[e9.length-1],ema21:e21[e21.length-1],rsi:rsiVal,macd:macdData,vwap:vwapVal,
-    avgVol:avgVol,lastVol:lastVol,volRatio:volRatio,mom10:mom10,
-    trendUp:e9[e9.length-1]>e21[e21.length-1],recentCloses:closes.slice(-8),
-  };
+function computeVwap(d) {
+  let ct=0,cv=0;
+  d.closes.forEach((c,i)=>{const tp=(d.highs[i]+d.lows[i]+c)/3;ct+=tp*d.volumes[i];cv+=d.volumes[i];});
+  return cv>0?ct/cv:d.closes[d.closes.length-1];
 }
 
-function getNiftyTrend(data) {
-  // Returns nifty market condition: BULLISH, BEARISH, or NEUTRAL
-  // Uses multiple timeframe signals on Nifty itself
-  var closes=data.closes, highs=data.highs, lows=data.lows;
-  if(closes.length<21)return{trend:'NEUTRAL',strength:0,reason:'Insufficient data'};
-  var last=closes[closes.length-1];
-  var e9=ema(closes,9), e21=ema(closes,21);
-  var rsiV=rsi(closes);
-  var macdD=macdCalc(closes);
-  var vwapV=vwapCalc(highs,lows,closes,data.volumes);
-  var change=last-(closes[closes.length-2]||last);
-  var changePct=(change/(closes[closes.length-2]||last))*100;
-  // 5-bar momentum
-  var mom5=closes.length>5?((last-closes[closes.length-6])/closes[closes.length-6])*100:0;
+function computeCPR(pdh, pdl, pdc) {
+  const pivot = (pdh + pdl + pdc) / 3;
+  const bc = (pdh + pdl) / 2;
+  const tc = pivot * 2 - bc;
+  return { pivot, bc: Math.min(bc, tc), tc: Math.max(bc, tc), width: Math.abs(tc - bc) };
+}
 
-  var score=0;
-  if(e9[e9.length-1]>e21[e21.length-1])score+=2; else score-=2;
-  if(macdD.hist>0)score+=2; else score-=2;
-  if(last>vwapV)score+=1; else score-=1;
-  if(rsiV>52)score+=1; else if(rsiV<48)score-=1;
-  if(mom5>0.3)score+=1; else if(mom5<-0.3)score-=1;
-  if(changePct>0.2)score+=1; else if(changePct<-0.2)score-=1;
-
-  var trend, reason;
-  if(score>=4){
-    trend='BULLISH';
-    reason='Nifty EMA uptrend, MACD positive, price above VWAP Rs '+vwapV.toFixed(0)+', RSI '+rsiV.toFixed(0);
-  } else if(score<=-4){
-    trend='BEARISH';
-    reason='Nifty EMA downtrend, MACD negative, price below VWAP Rs '+vwapV.toFixed(0)+', RSI '+rsiV.toFixed(0);
-  } else {
-    trend='NEUTRAL';
-    reason='Nifty mixed signals - score '+score+', RSI '+rsiV.toFixed(0)+', momentum '+mom5.toFixed(2)+'%';
-  }
-
-  return{
-    trend:trend,
-    score:score,
-    reason:reason,
-    niftyLast:last,
-    niftyChange:changePct.toFixed(2),
-    niftyRsi:rsiV.toFixed(0),
-    niftyEmaUp:e9[e9.length-1]>e21[e21.length-1],
-    niftyAboveVwap:last>vwapV,
-    niftyMacdBull:macdD.hist>0,
-  };
+function getNiftyTrend(d) {
+  if (!d || d.closes.length < 5) return { trend: 'NEUTRAL', change: 0 };
+  const last = d.closes[d.closes.length-1];
+  const prev = d.closes[d.closes.length-2] || last;
+  const change = (last - prev) / prev * 100;
+  // Simple trend: above/below VWAP + direction
+  const vwapV = computeVwap(d);
+  let score = 0;
+  if (last > vwapV) score += 2; else score -= 2;
+  if (change > 0.2) score += 2; else if (change < -0.2) score -= 2;
+  const trend = score >= 2 ? 'BULLISH' : score <= -2 ? 'BEARISH' : 'NEUTRAL';
+  return { trend, change: parseFloat(change.toFixed(2)), vwap: parseFloat(vwapV.toFixed(2)) };
 }
 
 export default async function handler(req, res) {
-  var symbol=req.query.symbol, type=req.query.type||'stock', interval=req.query.interval||'15min';
-  if(!symbol)return res.status(400).json({error:'Symbol required'});
+  const { symbol, type='stock', interval='15min' } = req.query;
+  if (!symbol) return res.status(400).json({ error: 'Symbol required' });
 
-  // Convert symbol to Yahoo format
-  var yhSymbol;
-  if(type==='index'){
-    var indexMap={'NIFTY':'^NSEI','BANKNIFTY':'^NSEBANK','NIFTY IT':'^CNXIT','NIFTY AUTO':'^CNXAUTO','NIFTY PHARMA':'^CNXPHARMA','NIFTY MIDCAP 50':'^CNXMIDCAP','NIFTY FMCG':'^CNXFMCG','NIFTY METAL':'^CNXMETAL'};
-    yhSymbol=indexMap[symbol]||('^'+symbol);
-  } else {
-    yhSymbol=symbol+'.NS';
-  }
+  // Convert to Yahoo format
+  const indexMap = {
+    'NIFTY':'^NSEI','BANKNIFTY':'^NSEBANK','NIFTY IT':'^CNXIT','NIFTY AUTO':'^CNXAUTO',
+    'NIFTY PHARMA':'^CNXPHARMA','NIFTY MIDCAP 50':'^CNXMIDCAP','NIFTY FMCG':'^CNXFMCG','NIFTY METAL':'^CNXMETAL',
+  };
+  const yhSym = type === 'index' ? (indexMap[symbol] || '^'+symbol) : symbol+'.NS';
+  const isNifty = type === 'index' && symbol === 'NIFTY';
 
-  try{
-    // Fetch instrument data and Nifty data in parallel
-    var isNifty=(symbol==='NIFTY'&&type==='index');
-    var promises=[fetchYahoo(yhSymbol, interval)];
-    if(!isNifty){
-      // Also fetch Nifty 50 as market filter
-      promises.push(fetchYahoo('^NSEI', interval));
+  try {
+    // Fetch intraday + daily (for PDH/PDL) + Nifty trend — all in parallel
+    const [intraday, daily, niftyIntraday] = await Promise.all([
+      fetchYahoo(yhSym, interval, interval === '5min' ? '2d' : '1d'),
+      fetchYahoo(yhSym, '1d', '5d'),  // for PDH/PDL/PDC
+      isNifty ? Promise.resolve(null) : fetchYahoo('^NSEI', '15min', '1d'),
+    ]);
+
+    if (intraday.closes.length < 3) throw new Error('Not enough intraday bars. Try during NSE hours 09:15-15:30 IST.');
+
+    // ── PREVIOUS DAY LEVELS ──────────────────────────────────────
+    const pdh = daily.closes.length >= 2 ? daily.highs[daily.closes.length - 2] : daily.highs[0];
+    const pdl = daily.closes.length >= 2 ? daily.lows[daily.closes.length - 2] : daily.lows[0];
+    const pdc = daily.closes.length >= 2 ? daily.closes[daily.closes.length - 2] : daily.closes[0];
+    const cpr = computeCPR(pdh, pdl, pdc);
+
+    // ── OPENING RANGE ────────────────────────────────────────────
+    // Filter to today's bars only (after 9:00am IST)
+    const nowTs = Date.now() / 1000;
+    const todayStart = nowTs - 8 * 3600; // last 8 hours
+    const todayBars = intraday.ts.map((_,i)=>i).filter(i => intraday.ts[i] > todayStart);
+    const orN = Math.min(2, todayBars.length > 0 ? todayBars.length : 2);
+    const orIdxs = todayBars.length > 0 ? todayBars.slice(0, orN) : [0, 1];
+    const orHigh = Math.max(...orIdxs.map(i => intraday.highs[i]));
+    const orLow = Math.min(...orIdxs.map(i => intraday.lows[i]));
+    const orRange = orHigh - orLow;
+    const orRangePct = (orRange / pdc) * 100;
+
+    // ── VWAP ─────────────────────────────────────────────────────
+    const todayD = {
+      closes: orIdxs.map(i=>intraday.closes[i]).concat(
+        todayBars.slice(orN).map(i=>intraday.closes[i])
+      ),
+      highs: orIdxs.map(i=>intraday.highs[i]).concat(todayBars.slice(orN).map(i=>intraday.highs[i])),
+      lows: orIdxs.map(i=>intraday.lows[i]).concat(todayBars.slice(orN).map(i=>intraday.lows[i])),
+      volumes: orIdxs.map(i=>intraday.volumes[i]).concat(todayBars.slice(orN).map(i=>intraday.volumes[i])),
+    };
+    const vwapVal = todayD.closes.length > 0 ? computeVwap(todayD) : computeVwap(intraday);
+
+    // ── CURRENT PRICE & SIGNAL ───────────────────────────────────
+    const price = intraday.closes[intraday.closes.length - 1];
+    const prevBarClose = intraday.closes[intraday.closes.length - 2] || price;
+    const barChange = (price - prevBarClose) / prevBarClose * 100;
+    const avgVol = intraday.volumes.slice(-10).reduce((a,b)=>a+b,0) / Math.min(10, intraday.volumes.length);
+    const lastVol = intraday.volumes[intraday.volumes.length - 1];
+    const volRatio = avgVol > 0 ? lastVol / avgVol : 1;
+
+    // ── ORB SIGNAL ───────────────────────────────────────────────
+    let orbSignal = 'NEUTRAL', orbReason = '';
+    let entry = null, stop = null, target = null;
+
+    // Check if breakout happened
+    const priceAboveOR = price > orHigh;
+    const priceBelowOR = price < orLow;
+    const volConfirmed = volRatio >= 1.3;
+    const priceAbovePDC = price > pdc;
+    const priceBelowPDC = price < pdc;
+    const orNotTooWide = orRangePct < 1.5; // skip if OR too wide (news event)
+
+    if (priceAboveOR && volConfirmed && priceAbovePDC && orNotTooWide) {
+      orbSignal = 'LONG';
+      orbReason = 'Price broke above OR High Rs '+orHigh.toFixed(1)+' with volume '+volRatio.toFixed(1)+'x avg and above PDC Rs '+pdc.toFixed(1);
+      entry = price;
+      stop = orLow;
+      target = price + (price - orLow) * 2;
+    } else if (priceBelowOR && volConfirmed && priceBelowPDC && orNotTooWide) {
+      orbSignal = 'SHORT';
+      orbReason = 'Price broke below OR Low Rs '+orLow.toFixed(1)+' with volume '+volRatio.toFixed(1)+'x avg and below PDC Rs '+pdc.toFixed(1);
+      entry = price;
+      stop = orHigh;
+      target = price - (orHigh - price) * 2;
+    } else if (price >= orLow && price <= orHigh) {
+      orbReason = 'Price inside Opening Range Rs '+orLow.toFixed(1)+' - Rs '+orHigh.toFixed(1)+'. Wait for breakout with volume.';
+    } else if (priceAboveOR && !volConfirmed) {
+      orbReason = 'Above OR High but volume only '+volRatio.toFixed(1)+'x avg — weak breakout. Wait for volume confirmation.';
+    } else if (priceBelowOR && !volConfirmed) {
+      orbReason = 'Below OR Low but volume only '+volRatio.toFixed(1)+'x avg — weak breakdown. Wait for volume confirmation.';
+    } else if (!orNotTooWide) {
+      orbReason = 'OR range '+orRangePct.toFixed(2)+'% is too wide — likely news/event driven. Avoid trading today.';
     }
 
-    var results=await Promise.all(promises);
-    var data=results[0];
-    var niftyData=isNifty?data:results[1];
+    // ── NIFTY TREND ──────────────────────────────────────────────
+    const niftyTrend = isNifty ? getNiftyTrend(intraday) : getNiftyTrend(niftyIntraday);
 
-    if(data.closes.length<10)throw new Error('Not enough data. Try during NSE hours: 09:15-15:30 IST on weekdays.');
+    // Nifty veto
+    if (orbSignal === 'LONG' && niftyTrend.trend === 'BEARISH') {
+      orbSignal = 'WATCH_LONG';
+      orbReason += ' — CAUTION: Nifty is bearish. Counter-trend long. Reduce size.';
+    }
+    if (orbSignal === 'SHORT' && niftyTrend.trend === 'BULLISH') {
+      orbSignal = 'WATCH_SHORT';
+      orbReason += ' — CAUTION: Nifty is bullish. Counter-trend short. Reduce size.';
+    }
 
-    var signals=computeSignals(data);
-    var niftyTrend=getNiftyTrend(niftyData);
+    // ── DISTANCE TO KEY LEVELS ───────────────────────────────────
+    const levels = [
+      { name: 'PDH', price: pdh, type: 'resistance', distance: ((pdh - price) / price * 100) },
+      { name: 'PDL', price: pdl, type: 'support', distance: ((pdl - price) / price * 100) },
+      { name: 'PDC', price: pdc, type: 'pivot', distance: ((pdc - price) / price * 100) },
+      { name: 'OR High', price: orHigh, type: 'or', distance: ((orHigh - price) / price * 100) },
+      { name: 'OR Low', price: orLow, type: 'or', distance: ((orLow - price) / price * 100) },
+      { name: 'VWAP', price: vwapVal, type: 'vwap', distance: ((vwapVal - price) / price * 100) },
+      { name: 'CPR Top', price: cpr.tc, type: 'cpr', distance: ((cpr.tc - price) / price * 100) },
+      { name: 'CPR Bot', price: cpr.bc, type: 'cpr', distance: ((cpr.bc - price) / price * 100) },
+    ].map(l => ({ ...l, price: parseFloat(l.price.toFixed(2)), distance: parseFloat(l.distance.toFixed(3)) }))
+     .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
 
-    res.status(200).json({data:data, signals:signals, niftyTrend:niftyTrend});
+    res.status(200).json({
+      // Price data
+      price: parseFloat(price.toFixed(2)),
+      change: parseFloat(barChange.toFixed(3)),
+      volRatio: parseFloat(volRatio.toFixed(2)),
+      lastVol,
 
-  }catch(err){
-    res.status(500).json({error:err.message});
+      // Key levels
+      pdh: parseFloat(pdh.toFixed(2)),
+      pdl: parseFloat(pdl.toFixed(2)),
+      pdc: parseFloat(pdc.toFixed(2)),
+      orHigh: parseFloat(orHigh.toFixed(2)),
+      orLow: parseFloat(orLow.toFixed(2)),
+      orRangePct: parseFloat(orRangePct.toFixed(3)),
+      vwap: parseFloat(vwapVal.toFixed(2)),
+      cpr,
+      levels,
+
+      // Signal
+      signal: orbSignal,
+      reason: orbReason,
+      entry: entry ? parseFloat(entry.toFixed(2)) : null,
+      stop: stop ? parseFloat(stop.toFixed(2)) : null,
+      target: target ? parseFloat(target.toFixed(2)) : null,
+      rr: entry && stop && target ? parseFloat(Math.abs((target-entry)/(entry-stop)).toFixed(1)) : null,
+
+      // Market context
+      niftyTrend,
+
+      // Raw bars for chart
+      bars: {
+        ts: intraday.ts.slice(-24),
+        opens: intraday.opens.slice(-24).map(v=>parseFloat(v.toFixed(2))),
+        highs: intraday.highs.slice(-24).map(v=>parseFloat(v.toFixed(2))),
+        lows: intraday.lows.slice(-24).map(v=>parseFloat(v.toFixed(2))),
+        closes: intraday.closes.slice(-24).map(v=>parseFloat(v.toFixed(2))),
+        volumes: intraday.volumes.slice(-24),
+      },
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 }
