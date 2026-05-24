@@ -97,7 +97,121 @@ const STOCKS = {
   midcap: ["DIXON.NS","TRENT.NS","POLYCAB.NS","VBL.NS","LAURUSLABS.NS","KPITTECH.NS","TATAELXSI.NS","PERSISTENT.NS","COFORGE.NS","RVNL.NS","IRFC.NS","PFC.NS","RECLTD.NS","IRCTC.NS","APLAPOLLO.NS","KEI.NS","RATNAMANI.NS","ASTRAL.NS","CHOLAFIN.NS","CAMS.NS"],
 };
 
+// ── MOMENTUM APPROACH ────────────────────────────────────────────────
+// Rank stocks by relative strength vs Nifty over lookback window
+// Buy top N, check forward return. Simple, proven, academic backing.
+
+function momentumScore(stockData, niftyData, dayIdx, lookbackDays) {
+  if (dayIdx < lookbackDays + 2) return null;
+  const nIdx = Math.min(dayIdx, niftyData.closes.length - 1);
+  const nStart = Math.max(0, nIdx - lookbackDays);
+  const stockRet = (stockData.closes[dayIdx] - stockData.closes[dayIdx - lookbackDays]) / stockData.closes[dayIdx - lookbackDays] * 100;
+  const niftyRet = (niftyData.closes[nIdx] - niftyData.closes[nStart]) / niftyData.closes[nStart] * 100;
+  return stockRet - niftyRet; // relative strength vs Nifty
+}
+
 export default async function handler(req, res) {
+  const method = req.query.method || 'pattern';
+  if (method === 'momentum') {
+    return handleMomentum(req, res);
+  }
+  return handlePattern(req, res);
+}
+
+async function handleMomentum(req, res) {
+  const universe  = req.query.universe  || 'top20';
+  const holdDays  = parseInt(req.query.hold    || '10');
+  const minMovePct = parseFloat(req.query.minMove || '3');
+  const lookback  = parseInt(req.query.lookback || '20'); // RS lookback window
+  const topN      = parseInt(req.query.topN     || '5');  // buy top N stocks
+
+  const stocks = [...new Set(STOCKS[universe] || STOCKS.top20)];
+
+  const nifty = await fetchDaily('^NSEI');
+  if (!nifty) return res.status(500).json({ error: 'Failed to fetch Nifty' });
+
+  // Fetch all stock data in parallel batches
+  const allData = {};
+  const batchSize = 5;
+  for (let b = 0; b < stocks.length; b += batchSize) {
+    const batch = stocks.slice(b, b + batchSize);
+    const results = await Promise.all(batch.map(s => fetchDaily(s)));
+    batch.forEach((sym, idx) => { if (results[idx] && results[idx].closes.length >= 60) allData[sym] = results[idx]; });
+  }
+
+  const done = Object.keys(allData).length;
+  if (done < 5) return res.status(500).json({ error: 'Not enough stock data fetched' });
+
+  // Walk forward: every week, rank stocks by momentum, buy top N, check forward return
+  const minLen = Math.min(...Object.values(allData).map(d => d.closes.length));
+  const testStart = Math.max(lookback + 5, minLen - 100 - holdDays);
+  const testEnd   = minLen - holdDays - 1;
+
+  let totalTrades = 0, wins = 0, losses = 0, totalRet = 0;
+  const examples = [];
+  const weeklyResults = [];
+
+  // Test every 5 trading days (weekly rebalance)
+  for (let i = testStart; i <= testEnd; i += 5) {
+    // Rank all stocks by momentum score at this point in time
+    const scored = stocks
+      .filter(sym => allData[sym] && allData[sym].closes.length > i + holdDays)
+      .map(sym => ({
+        sym,
+        rs: momentumScore(allData[sym], nifty, i, lookback),
+        fwd: (allData[sym].closes[i + holdDays] - allData[sym].closes[i]) / allData[sym].closes[i] * 100,
+      }))
+      .filter(x => x.rs !== null)
+      .sort((a, b) => b.rs - a.rs);
+
+    if (scored.length < topN) continue;
+
+    // Buy top N momentum stocks
+    const topPicks = scored.slice(0, topN);
+    const bottomN  = scored.slice(-topN); // for comparison
+
+    topPicks.forEach(pick => {
+      totalTrades++;
+      totalRet += pick.fwd;
+      const win = pick.fwd >= minMovePct;
+      if (win) { wins++; if (examples.length < 8) examples.push({ sym: pick.sym.replace('.NS',''), rs: pick.rs.toFixed(1), ret: pick.fwd.toFixed(1), win: true }); }
+      else { losses++; if (examples.length < 8 && Math.random() < 0.3) examples.push({ sym: pick.sym.replace('.NS',''), rs: pick.rs.toFixed(1), ret: pick.fwd.toFixed(1), win: false }); }
+    });
+
+    // Track weekly result for display
+    const avgTopRet = topPicks.reduce((a, b) => a + b.fwd, 0) / topPicks.length;
+    const avgBotRet = bottomN.reduce((a, b) => a + b.fwd, 0) / bottomN.length;
+    weeklyResults.push({
+      dayIdx: i,
+      topPicks: topPicks.slice(0, 3).map(p => p.sym.replace('.NS','')),
+      avgTopRet: parseFloat(avgTopRet.toFixed(1)),
+      avgBotRet: parseFloat(avgBotRet.toFixed(1)),
+      spread: parseFloat((avgTopRet - avgBotRet).toFixed(1)),
+    });
+  }
+
+  const accuracy    = totalTrades > 0 ? Math.round(wins / totalTrades * 100) : 0;
+  const avgReturn   = totalTrades > 0 ? parseFloat((totalRet / totalTrades).toFixed(1)) : 0;
+  const avgSpread   = weeklyResults.length > 0 ? parseFloat((weeklyResults.reduce((a,b)=>a+b.spread,0)/weeklyResults.length).toFixed(1)) : 0;
+  const verdict     = accuracy >= 80 ? 'BUILD' : accuracy >= 65 ? 'TUNE' : 'REVISE';
+
+  res.status(200).json({
+    method: 'momentum',
+    settings: { universe, holdDays, minMovePct, lookback, topN },
+    stocksDone: done,
+    totalTrades,
+    accuracy,
+    avgReturn,
+    wins, losses,
+    avgSpread, // avg outperformance of top vs bottom quintile
+    weeklyResults: weeklyResults.slice(-10),
+    examples,
+    verdict,
+    note: 'Momentum: buy top ' + topN + ' stocks by ' + lookback + '-day RS vs Nifty, hold ' + holdDays + ' days, rebalance weekly',
+  });
+}
+
+async function handlePattern(req, res) {
   const universe  = req.query.universe  || 'top20';
   const holdDays  = parseInt(req.query.hold || '10');
   const minMovePct = parseFloat(req.query.minMove || '5');
@@ -180,4 +294,5 @@ export default async function handler(req, res) {
     })),
     verdict: compAcc >= 80 ? 'BUILD' : compAcc >= 65 ? 'TUNE' : 'REVISE',
   });
+}
 }
