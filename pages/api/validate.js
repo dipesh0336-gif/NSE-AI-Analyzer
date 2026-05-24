@@ -111,10 +111,13 @@ function momentumScore(stockData, niftyData, dayIdx, lookbackDays) {
 }
 
 export default async function handler(req, res) {
-  const method = req.query.method || 'pattern';
+  const method = (req.query.method || 'pattern').trim().toLowerCase();
+  console.log('Validate API called with method:', method, 'query:', JSON.stringify(req.query));
   if (method === 'momentum') {
+    console.log('Routing to momentum handler');
     return handleMomentum(req, res);
   }
+  console.log('Routing to pattern handler');
   return handlePattern(req, res);
 }
 
@@ -197,6 +200,7 @@ async function handleMomentum(req, res) {
 
   res.status(200).json({
     method: 'momentum',
+    debug: 'momentum_handler_ran',
     settings: { universe, holdDays, minMovePct, lookback, topN },
     stocksDone: done,
     totalTrades,
