@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect } from 'react';
 
 const NSE_STOCKS = [
@@ -619,10 +620,7 @@ export default function Home() {
           })
         ),
         React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8}},'Tested: '+valResult.stocksDone+' stocks · '+valHold+'d hold · Win >'+valMin+'% · Yahoo Finance NSE data')
-      ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select settings above and tap
-RUN PATTERN VALIDATION
-to test the 5 pre-breakout patterns
-on real historical NSE data.')
+      ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select settings above and tap RUN PATTERN VALIDATION to test the 5 pre-breakout patterns on real historical NSE data.')
     ):null,
 
     React.createElement('div',{style:{fontSize:10,color:'#4a6080',padding:'6px 14px 10px',display:'flex',alignItems:'center',gap:6}},
