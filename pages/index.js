@@ -540,10 +540,10 @@ export default function Home() {
           React.createElement('div',null,
             React.createElement('div',{style:{fontSize:9,color:'#4a6080',marginBottom:4}},'Hold Period'),
             React.createElement('select',{value:valHold,onChange:function(e){setValHold(e.target.value);},style:sel},
-              React.createElement('option',{value:'5'},'5 days (1 week)'),
-              React.createElement('option',{value:'10'},'10 days (2 weeks)'),
-              React.createElement('option',{value:'15'},'15 days (3 weeks)'),
-              React.createElement('option',{value:'20'},'20 days (1 month)')
+              React.createElement('option',{value:'5'},'5 days'),
+              React.createElement('option',{value:'10'},'10 days'),
+              React.createElement('option',{value:'15'},'15 days'),
+              React.createElement('option',{value:'20'},'20 days')
             )
           ),
           React.createElement('div',null,
@@ -557,21 +557,19 @@ export default function Home() {
         ),
         React.createElement('button',{onClick:runValidate,disabled:valLoading,
           style:{width:'100%',padding:13,background:'#ce93d8',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:valLoading?0.4:1}
-        },valLoading?'Running validation on server...':'RUN PATTERN VALIDATION')
+        },valLoading?'Running on server...':'RUN PATTERN VALIDATION')
       ),
       valErr?React.createElement('div',{style:{fontSize:11,color:R,padding:'10px 12px',background:'#2d0a0a',border:'1px solid #ff444433',borderRadius:8,marginBottom:10}},'Error: '+valErr):null,
       valResult?React.createElement('div',null,
-        // Composite result
         React.createElement('div',{style:{background:valResult.composite.accuracy>=80?'#052e16':valResult.composite.accuracy>=65?'#2d1e00':'#2d0a0a',border:'1px solid '+(valResult.composite.accuracy>=80?'#00e67644':valResult.composite.accuracy>=65?'#ffb30044':'#ff444444'),borderRadius:12,padding:14,marginBottom:10}},
-          React.createElement('div',{style:{fontSize:9,color:'#8899bb',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}},'Combined Pattern Accuracy (score ≥65)'),
-          React.createElement('div',{style:{fontSize:32,fontWeight:800,fontFamily:'sans-serif',color:valResult.composite.accuracy>=80?G:valResult.composite.accuracy>=65?A:R}}),
+          React.createElement('div',{style:{fontSize:9,color:'#8899bb',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}},'Combined accuracy — '+valHold+' day hold, win > '+valMin+'%'),
           React.createElement('div',{style:{fontSize:34,fontWeight:800,fontFamily:'sans-serif',color:valResult.composite.accuracy>=80?G:valResult.composite.accuracy>=65?A:R,marginBottom:4}},valResult.composite.accuracy+'%'),
           React.createElement('div',{style:{fontSize:11,color:'#8899bb',marginBottom:8}},valResult.composite.wins+' wins / '+valResult.composite.hits+' signals · Avg return +'+valResult.composite.avgReturn+'%'),
           React.createElement('div',{style:{height:8,background:'rgba(0,0,0,0.3)',borderRadius:4,overflow:'hidden',marginBottom:10}},
-            React.createElement('div',{style:{height:'100%',borderRadius:4,width:valResult.composite.accuracy+'%',background:valResult.composite.accuracy>=80?G:valResult.composite.accuracy>=65?A:R,transition:'width 1s'}})
+            React.createElement('div',{style:{height:'100%',borderRadius:4,width:Math.min(valResult.composite.accuracy,100)+'%',background:valResult.composite.accuracy>=80?G:valResult.composite.accuracy>=65?A:R,transition:'width 1s'}})
           ),
           React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:10}},
-            [['Signals',valResult.composite.hits,'#e2e8f0'],['Avg Return','+'+valResult.composite.avgReturn+'%','#e2e8f0'],['Winners',valResult.composite.wins,G],['Below threshold',valResult.composite.losses,R]].map(function(x){
+            [['Signals',valResult.composite.hits,'#e2e8f0'],['Avg Return','+'+valResult.composite.avgReturn+'%','#e2e8f0'],['Winners',valResult.composite.wins,G],['Losses',valResult.composite.losses,R]].map(function(x){
               return React.createElement('div',{key:x[0],style:{background:'rgba(0,0,0,0.3)',borderRadius:6,padding:'7px 10px'}},
                 React.createElement('div',{style:{fontSize:14,fontWeight:700,color:x[2]}},x[1]),
                 React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',marginTop:2}},x[0])
@@ -579,33 +577,33 @@ export default function Home() {
             })
           ),
           React.createElement('div',{style:{fontSize:12,fontWeight:700,padding:'8px 12px',borderRadius:6,background:'rgba(0,0,0,0.3)',color:valResult.composite.accuracy>=80?G:valResult.composite.accuracy>=65?A:R}},
-            valResult.verdict==='BUILD'?'✓ Accuracy above 80% — PROCEED TO BUILD the positional scanner':
-            valResult.verdict==='TUNE' ?'~ Moderate edge — adjust thresholds before building':
-            '✗ Below 65% — patterns need revision. Do NOT build yet.'
+            valResult.verdict==='BUILD'?'PROCEED — accuracy above 80%, build the scanner':
+            valResult.verdict==='TUNE'?'TUNE — moderate edge, adjust thresholds first':
+            'REVISE — below 65%, patterns need rethinking'
           )
         ),
-        // Per-pattern breakdown
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:14,marginBottom:10}},
           React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:10}},'Individual Pattern Accuracy'),
           valResult.patterns.map(function(p){
-            var c=p.accuracy>=80?G:p.accuracy>=65?A:R;
-            var bg=p.accuracy>=80?'bg':p.accuracy>=65?'ba':'br';
+            var pc=p.accuracy>=80?G:p.accuracy>=65?A:R;
             return React.createElement('div',{key:p.name,style:{marginBottom:12,paddingBottom:12,borderBottom:'1px solid #1a2235'}},
-              React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}},
-                React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#e2e8f0'}},p.name),
-                React.createElement('div',{style:{fontSize:11,fontWeight:700,color:c}},p.accuracy+'%')
+              React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}},
+                React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'#e2e8f0'}},p.name),
+                React.createElement('div',{style:{fontSize:12,fontWeight:700,color:pc}},p.accuracy+'%')
               ),
               React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginBottom:4}},p.desc),
-              React.createElement('div',{style:{height:6,background:'#1a2235',borderRadius:3,overflow:'hidden',marginBottom:4}},
-                React.createElement('div',{style:{height:'100%',borderRadius:3,width:p.accuracy+'%',background:c,transition:'width 1s'}})
+              React.createElement('div',{style:{height:5,background:'#1a2235',borderRadius:3,overflow:'hidden',marginBottom:3}},
+                React.createElement('div',{style:{height:'100%',borderRadius:3,width:Math.min(p.accuracy,100)+'%',background:pc}})
               ),
               React.createElement('div',{style:{fontSize:10,color:'#8899bb'}},p.hits+' signals · '+p.wins+' wins · avg +'+p.avgReturn+'%')
             );
           })
         ),
-        React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8,padding:'4px 0'}},
-          'Tested on '+valResult.stocksDone+' stocks · '+valHold+'-day hold · Win = move >'+valMin+'% · Data: Yahoo Finance historical NSE')
-      ):null
+        React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8}},'Tested: '+valResult.stocksDone+' stocks · '+valHold+'d hold · Win >'+valMin+'% · Yahoo Finance NSE data')
+      ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select settings above and tap
+RUN PATTERN VALIDATION
+to test the 5 pre-breakout patterns
+on real historical NSE data.')
     ):null,
 
     React.createElement('div',{style:{fontSize:10,color:'#4a6080',padding:'6px 14px 10px',display:'flex',alignItems:'center',gap:6}},
