@@ -102,9 +102,10 @@ function StockSearch({onSelect, selected, onClear}) {
 
 function LevelChart({data}) {
   if (!data) return null;
-  const {price, pdh, pdl, pdc, orHigh, orLow, vwap, entry, stop, target} = data;
+  var price = data.price, pdh = data.pdh, pdl = data.pdl, pdc = data.pdc;
+  var orHigh = data.orHigh, orLow = data.orLow, vwap = data.vwap;
+  var entry = data.entry, stop = data.stop, target = data.target;
 
-  // All named levels sorted by value descending
   var allLevels = [
     {label:'OR High', val:orHigh, color:A, dash:false},
     {label:'PDH',     val:pdh,    color:R, dash:true},
@@ -116,66 +117,68 @@ function LevelChart({data}) {
   if (target) allLevels.push({label:'Target', val:target, color:G, dash:false, bold:true});
   if (stop)   allLevels.push({label:'Stop',   val:stop,   color:R, dash:false, bold:true});
 
-  // Sort descending by value
   allLevels.sort(function(a,b){return b.val - a.val;});
 
-  // Add current price as a special marker
-  var priceEntry = {label:'price', val:price};
-
-  // Collect all values including price for scale
   var allVals = allLevels.map(function(l){return l.val;}).concat([price]);
   var minV = Math.min.apply(null, allVals);
   var maxV = Math.max.apply(null, allVals);
   var span = maxV - minV || 1;
 
-  // Natural % position (0=top, 100=bottom) with 8% padding each side
-  function naturalPct(v) {
-    return 8 + ((maxV - v) / span) * 84;
+  // Add 15% padding so labels at extremes don't get clipped
+  var padded = span * 0.15;
+  var minVp = minV - padded;
+  var maxVp = maxV + padded;
+  var spanP = maxVp - minVp;
+
+  function linePct(v) {
+    return Math.min(97, Math.max(3, ((maxVp - v) / spanP) * 100));
   }
 
-  // Spread labels: assign display positions with minimum gap
-  // Start from natural positions, then push apart if needed
-  var minGap = 11; // px-equivalent in % units
-  var displayPos = allLevels.map(function(l){ return {label:l.label, pos:naturalPct(l.val)}; });
+  // Spread label positions with min gap
+  var minGap = 12;
+  var labelPos = allLevels.map(function(l){ return {label:l.label, pos:linePct(l.val)}; });
 
-  // Push down: top to bottom
-  for (var i = 1; i < displayPos.length; i++) {
-    if (displayPos[i].pos < displayPos[i-1].pos + minGap) {
-      displayPos[i].pos = displayPos[i-1].pos + minGap;
+  // Forward pass: push down
+  for (var i = 1; i < labelPos.length; i++) {
+    if (labelPos[i].pos < labelPos[i-1].pos + minGap) {
+      labelPos[i].pos = labelPos[i-1].pos + minGap;
     }
   }
-  // Push up: bottom to top (reverse pass to resolve bottom overflow)
-  for (var i = displayPos.length - 2; i >= 0; i--) {
-    if (displayPos[i].pos > displayPos[i+1].pos - minGap) {
-      displayPos[i].pos = displayPos[i+1].pos - minGap;
+  // Backward pass: pull up if overflowed bottom
+  for (var i = labelPos.length - 2; i >= 0; i--) {
+    if (labelPos[i].pos > labelPos[i+1].pos - minGap) {
+      labelPos[i].pos = labelPos[i+1].pos - minGap;
     }
   }
-  // Clamp all within 3–96
-  displayPos.forEach(function(d){ d.pos = Math.max(3, Math.min(96, d.pos)); });
+  labelPos.forEach(function(d){ d.pos = Math.max(2, Math.min(97, d.pos)); });
 
-  function getLabelPos(label) {
-    var d = displayPos.find(function(x){return x.label===label;});
-    return d ? d.pos : naturalPct(0);
+  function getLblPos(label) {
+    var d = labelPos.find(function(x){return x.label===label;});
+    return d ? d.pos : 50;
   }
 
-  var pricePct = naturalPct(price);
+  var pricePct = linePct(price);
 
-  return React.createElement('div',{style:{position:'relative',height:260,background:'#0d1520',borderRadius:8,overflow:'hidden',marginBottom:4}},
+  return React.createElement('div',{style:{position:'relative',height:280,background:'#0d1520',borderRadius:8,overflow:'hidden',marginBottom:4}},
     allLevels.map(function(l) {
-      var linePct = naturalPct(l.val);
-      var lblPct  = getLabelPos(l.label);
+      var lp = linePct(l.val);
+      var dp = getLblPos(l.label);
       return React.createElement('div',{key:l.label},
-        React.createElement('div',{style:{position:'absolute',left:78,right:6,top:linePct+'%',borderTop:'1px '+(l.dash?'dashed':'solid')+' '+l.color,opacity:0.55}}),
-        React.createElement('div',{style:{position:'absolute',left:2,top:'calc('+lblPct+'% - 7px)',fontSize:9,color:l.color,fontWeight:l.bold?700:400,whiteSpace:'nowrap',lineHeight:1.2}},
+        // Horizontal level line at true price position
+        React.createElement('div',{style:{position:'absolute',left:0,right:0,top:lp+'%',borderTop:'1px '+(l.dash?'dashed':'solid')+' '+l.color,opacity:0.5}}),
+        // Label at spread position (left side)
+        React.createElement('div',{style:{position:'absolute',left:4,top:'calc('+dp+'% - 7px)',fontSize:9,color:l.color,fontWeight:l.bold?700:400,whiteSpace:'nowrap',lineHeight:1.2,background:'#0d1520',paddingRight:3}},
           l.label+' '+l.val.toFixed(1))
       );
     }),
-    React.createElement('div',{style:{position:'absolute',left:78,right:6,top:pricePct+'%',borderTop:'2px solid #e2e8f0',zIndex:5}},
-      React.createElement('div',{style:{position:'absolute',right:0,top:-5,width:8,height:8,borderRadius:'50%',background:'#e2e8f0'}})
-    ),
-    React.createElement('div',{style:{position:'absolute',left:2,top:'calc('+pricePct+'% - 8px)',fontSize:10,color:'#e2e8f0',fontWeight:700,whiteSpace:'nowrap',zIndex:6,background:'#0d1520',paddingRight:2}},
+    // Price line at true position
+    React.createElement('div',{style:{position:'absolute',left:0,right:0,top:pricePct+'%',borderTop:'2px solid #e2e8f0',zIndex:5}}),
+    // Price label on RIGHT side to avoid clashing with level labels
+    React.createElement('div',{style:{position:'absolute',right:6,top:'calc('+pricePct+'% - 9px)',fontSize:10,color:'#e2e8f0',fontWeight:700,whiteSpace:'nowrap',zIndex:7,background:'#0d1520',paddingLeft:3}},
       'Rs '+price.toFixed(1)),
-    entry?React.createElement('div',{style:{position:'absolute',left:78,right:6,top:naturalPct(entry)+'%',borderTop:'2px solid '+G,zIndex:4,opacity:0.9}}):null
+    // Dot at right end of price line
+    React.createElement('div',{style:{position:'absolute',right:4,top:'calc('+pricePct+'% - 4px)',width:8,height:8,borderRadius:'50%',background:'#e2e8f0',zIndex:6}}),
+    entry?React.createElement('div',{style:{position:'absolute',left:0,right:0,top:linePct(entry)+'%',borderTop:'2px solid '+G,zIndex:4,opacity:0.9}}):null
   );
 }
 
