@@ -264,6 +264,12 @@ export default function Home() {
   const [scanData,setScanData]=useState(null);
   const [scanLoading,setScanLoading]=useState(false);
   const [scanErr,setScanErr]=useState('');
+  const [valLoading,setValLoading]=useState(false);
+  const [valResult,setValResult]=useState(null);
+  const [valErr,setValErr]=useState('');
+  const [valUniverse,setValUniverse]=useState('top20');
+  const [valHold,setValHold]=useState('10');
+  const [valMin,setValMin]=useState('5');
 
   useEffect(()=>{
     const tick=()=>{
@@ -309,6 +315,17 @@ export default function Home() {
   const sigColor=d?(d.signal==='LONG'?G:d.signal==='SHORT'?R:d.signal==='WATCH_LONG'?A:d.signal==='WATCH_SHORT'?A:'#8899bb'):'#8899bb';
   const sigBg=d?(d.signal==='LONG'?'#052e16':d.signal==='SHORT'?'#2d0a0a':'#2d1e00'):'#1a2235';
   const nColor=d?.niftyTrend?(d.niftyTrend.trend==='BULLISH'?G:d.niftyTrend.trend==='BEARISH'?R:A):A;
+
+  async function runValidate(){
+    setValLoading(true);setValErr('');setValResult(null);
+    try{
+      const r=await fetch('/api/validate?universe='+valUniverse+'&hold='+valHold+'&minMove='+valMin);
+      const j=await r.json();
+      if(!r.ok||j.error)throw new Error(j.error||'Validation failed');
+      setValResult(j);
+    }catch(e){setValErr(e.message);}
+    setValLoading(false);
+  }
 
   const instrSelector=React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
     React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}},
