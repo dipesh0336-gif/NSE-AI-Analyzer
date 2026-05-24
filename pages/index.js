@@ -321,7 +321,7 @@ export default function Home() {
   const nColor=d&&d.niftyTrend?(d.niftyTrend.trend==='BULLISH'?G:d.niftyTrend.trend==='BEARISH'?R:A):A;
 
   async function runValidate(){
-    setValLoading(true);setValErr('');setValResult(null);setMomResult(null);
+    setValLoading(true);setValErr('');setValResult(null);setMomResult(null);console.log('Running with method:',valMethod);
     try{
       var url='/api/validate?universe='+valUniverse+'&hold='+valHold+'&minMove='+valMin+'&method='+valMethod+'&lookback='+momLookback;
       const r=await fetch(url);
