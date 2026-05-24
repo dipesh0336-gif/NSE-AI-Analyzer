@@ -285,7 +285,7 @@ export default function Home() {
   },[]);
 
   async function analyze() {
-    const symbol=instrType==='index'?idx.s:stock?.s;
+    const symbol=instrType==='index'?idx.s:(stock?stock.s:null);
     const type=instrType==='index'?'index':'stock';
     if(!symbol){setErr('Please select a stock.');return;}
     setLoading(true);setErr('');setMktData(null);
@@ -314,7 +314,7 @@ export default function Home() {
   const d=mktData;
   const sigColor=d?(d.signal==='LONG'?G:d.signal==='SHORT'?R:d.signal==='WATCH_LONG'?A:d.signal==='WATCH_SHORT'?A:'#8899bb'):'#8899bb';
   const sigBg=d?(d.signal==='LONG'?'#052e16':d.signal==='SHORT'?'#2d0a0a':'#2d1e00'):'#1a2235';
-  const nColor=d?.niftyTrend?(d.niftyTrend.trend==='BULLISH'?G:d.niftyTrend.trend==='BEARISH'?R:A):A;
+  const nColor=d&&d.niftyTrend?(d.niftyTrend.trend==='BULLISH'?G:d.niftyTrend.trend==='BEARISH'?R:A):A;
 
   async function runValidate(){
     setValLoading(true);setValErr('');setValResult(null);
@@ -373,7 +373,8 @@ export default function Home() {
 
     // TABS
     React.createElement('div',{style:{display:'flex',background:'#111827',borderBottom:'1px solid #1e2d45'}},
-      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['backtest','Backtest'],['validate','Validate']].map(([t,label])=>{
+      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['backtest','Backtest'],['validate','Validate']].map(function(tabItem){
+        var t=tabItem[0]; var label=tabItem[1];
         const active=tab===t;
         return React.createElement('button',{key:t,onClick:()=>setTab(t),style:{flex:1,padding:'10px 4px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.08em',fontFamily:'monospace'}},label);
       })
@@ -424,8 +425,8 @@ export default function Home() {
             ),
             React.createElement('div',{style:{textAlign:'right'}},
               React.createElement('div',{style:{fontSize:9,color:'#8899bb',marginBottom:2}},'NIFTY TREND'),
-              React.createElement('div',{style:{fontSize:13,fontWeight:700,color:nColor}},d.niftyTrend?.trend||'--'),
-              React.createElement('div',{style:{fontSize:10,color:nColor}},(d.niftyTrend?.change>=0?'+':'')+d.niftyTrend?.change+'%')
+              React.createElement('div',{style:{fontSize:13,fontWeight:700,color:nColor}},(d.niftyTrend?d.niftyTrend.trend:'--')||'--'),
+              React.createElement('div',{style:{fontSize:10,color:nColor}},((d.niftyTrend?d.niftyTrend.change:0)>=0?'+':'')+(d.niftyTrend?d.niftyTrend.change:0)+'%')
             )
           ),
           d.entry?React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:10}},
@@ -485,7 +486,7 @@ export default function Home() {
     tab==='backtest'?React.createElement('div',{style:{padding:'12px 12px 20px'}},
       instrSelector,
       React.createElement('button',{onClick:async()=>{
-        const symbol=instrType==='index'?idx.s:stock?.s;
+        const symbol=instrType==='index'?idx.s:(stock?stock.s:null);
         const type=instrType==='index'?'index':'stock';
         if(!symbol){setErr('Please select a stock.');return;}
         setLoading(true);setErr('');
@@ -501,7 +502,7 @@ export default function Home() {
         'RUN BACKTEST'
       ),
       err?React.createElement('div',{style:{fontSize:11,color:R,padding:'10px 12px',background:'#2d0a0a',border:'1px solid #ff444433',borderRadius:8,marginBottom:10}},'Error: '+err):null,
-      mktData?._backtest?React.createElement('div',null,
+      mktData&&mktData._backtest?React.createElement('div',null,
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:14,marginBottom:10}},
           React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},'Backtest Results'),
           React.createElement('div',{style:{fontSize:36,fontWeight:800,color:mktData._backtest.accuracy>=60?G:mktData._backtest.accuracy>=45?A:R,fontFamily:'sans-serif'}},mktData._backtest.accuracy+'%'),
@@ -509,13 +510,14 @@ export default function Home() {
           React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginTop:10}},
             [['LONG',mktData._backtest.longAccuracy+'%',G,mktData._backtest.longCalls+' calls'],
              ['SHORT',mktData._backtest.shortAccuracy+'%',R,mktData._backtest.shortCalls+' calls'],
-             ['NEUTRAL',mktData._backtest.neutralRate+'%',A,mktData._backtest.neutralCalls+' skipped']].map(([lbl,val,c,sub])=>
-              React.createElement('div',{key:lbl,style:{background:'#0d1520',borderRadius:8,padding:'8px 10px'}},
+             ['NEUTRAL',mktData._backtest.neutralRate+'%',A,mktData._backtest.neutralCalls+' skipped']].map(function(item){
+                var lbl=item[0];var val=item[1];var c=item[2];var sub=item[3];
+              return React.createElement('div',{key:lbl,style:{background:'#0d1520',borderRadius:8,padding:'8px 10px'}},
                 React.createElement('div',{style:{fontSize:9,color:'#4a6080',marginBottom:3}},lbl),
                 React.createElement('div',{style:{fontSize:16,fontWeight:700,color:c}},val),
                 React.createElement('div',{style:{fontSize:9,color:'#4a6080'}},sub)
-              )
-            )
+              );
+            })
           )
         ),
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:14,marginBottom:10}},
