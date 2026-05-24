@@ -271,6 +271,9 @@ export default function Home() {
   const [valUniverse,setValUniverse]=useState('top20');
   const [valHold,setValHold]=useState('10');
   const [valMin,setValMin]=useState('5');
+  const [valMethod,setValMethod]=useState('pattern');
+  const [momLookback,setMomLookback]=useState('20');
+  const [momResult,setMomResult]=useState(null);
 
   useEffect(()=>{
     const tick=()=>{
@@ -318,12 +321,14 @@ export default function Home() {
   const nColor=d&&d.niftyTrend?(d.niftyTrend.trend==='BULLISH'?G:d.niftyTrend.trend==='BEARISH'?R:A):A;
 
   async function runValidate(){
-    setValLoading(true);setValErr('');setValResult(null);
+    setValLoading(true);setValErr('');setValResult(null);setMomResult(null);
     try{
-      const r=await fetch('/api/validate?universe='+valUniverse+'&hold='+valHold+'&minMove='+valMin);
+      var url='/api/validate?universe='+valUniverse+'&hold='+valHold+'&minMove='+valMin+'&method='+valMethod+'&lookback='+momLookback;
+      const r=await fetch(url);
       const j=await r.json();
       if(!r.ok||j.error)throw new Error(j.error||'Validation failed');
-      setValResult(j);
+      if(j.method==='momentum')setMomResult(j);
+      else setValResult(j);
     }catch(e){setValErr(e.message);}
     setValLoading(false);
   }
@@ -575,11 +580,52 @@ export default function Home() {
             )
           )
         ),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}},
+          React.createElement('button',{
+            onClick:function(){setValMethod('pattern');},
+            style:{padding:'10px',background:valMethod==='pattern'?'#ce93d8':'#1a2235',color:valMethod==='pattern'?'#000':'#ce93d8',border:'1px solid #ce93d8',borderRadius:8,fontFamily:'sans-serif',fontSize:12,fontWeight:700,cursor:'pointer'}
+          },'Pattern Score'),
+          React.createElement('button',{
+            onClick:function(){setValMethod('momentum');},
+            style:{padding:'10px',background:valMethod==='momentum'?'#4fc3f7':'#1a2235',color:valMethod==='momentum'?'#000':'#4fc3f7',border:'1px solid #4fc3f7',borderRadius:8,fontFamily:'sans-serif',fontSize:12,fontWeight:700,cursor:'pointer'}
+          },'Momentum RS')
+        ),
+        valMethod==='momentum'?React.createElement('div',{style:{marginBottom:8}},
+          React.createElement('div',{style:{fontSize:9,color:'#4a6080',marginBottom:4}},'RS Lookback Window'),
+          React.createElement('select',{value:momLookback,onChange:function(e){setMomLookback(e.target.value);},style:sel},
+            React.createElement('option',{value:'10'},'10 days (2 weeks)'),
+            React.createElement('option',{value:'20'},'20 days (1 month)'),
+            React.createElement('option',{value:'40'},'40 days (2 months)'),
+            React.createElement('option',{value:'60'},'60 days (3 months)')
+          )
+        ):null,
         React.createElement('button',{onClick:runValidate,disabled:valLoading,
-          style:{width:'100%',padding:13,background:'#ce93d8',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:valLoading?0.4:1}
-        },valLoading?'Running on server...':'RUN PATTERN VALIDATION')
+          style:{width:'100%',padding:13,background:valMethod==='momentum'?'#4fc3f7':'#ce93d8',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:valLoading?0.4:1}
+        },valLoading?'Running on server...':valMethod==='momentum'?'TEST MOMENTUM STRATEGY':'RUN PATTERN VALIDATION')
       ),
       valErr?React.createElement('div',{style:{fontSize:11,color:R,padding:'10px 12px',background:'#2d0a0a',border:'1px solid #ff444433',borderRadius:8,marginBottom:10}},'Error: '+valErr):null,
+      momResult?React.createElement('div',{style:{background:momResult.accuracy>=65?'#052e16':momResult.accuracy>=50?'#2d1e00':'#2d0a0a',border:'1px solid '+(momResult.accuracy>=65?'#00e67644':momResult.accuracy>=50?'#ffb30044':'#ff444433'),borderRadius:12,padding:14,marginBottom:10}},
+        React.createElement('div',{style:{fontSize:9,color:'#8899bb',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}},'Momentum strategy — buy top 5 by RS, hold '+valHold+' days'),
+        React.createElement('div',{style:{fontSize:34,fontWeight:800,fontFamily:'sans-serif',color:momResult.accuracy>=65?G:momResult.accuracy>=50?A:R,marginBottom:4}},momResult.accuracy+'%'),
+        React.createElement('div',{style:{fontSize:11,color:'#8899bb',marginBottom:8}},momResult.wins+' wins / '+momResult.totalTrades+' trades · Avg return +'+momResult.avgReturn+'% · Avg RS spread vs bottom: +'+momResult.avgSpread+'%'),
+        React.createElement('div',{style:{height:8,background:'rgba(0,0,0,0.3)',borderRadius:4,overflow:'hidden',marginBottom:10}},
+          React.createElement('div',{style:{height:'100%',borderRadius:4,width:Math.min(momResult.accuracy,100)+'%',background:momResult.accuracy>=65?G:momResult.accuracy>=50?A:R,transition:'width 1s'}})
+        ),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:10}},
+          [['Trades',momResult.totalTrades,'#e2e8f0'],['Avg Return','+'+momResult.avgReturn+'%',momResult.avgReturn>0?G:R],['Winners',momResult.wins,G],['Losses',momResult.losses,R]].map(function(x){
+            return React.createElement('div',{key:x[0],style:{background:'rgba(0,0,0,0.3)',borderRadius:6,padding:'7px 10px'}},
+              React.createElement('div',{style:{fontSize:14,fontWeight:700,color:x[2]}},x[1]),
+              React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',marginTop:2}},x[0])
+            );
+          })
+        ),
+        React.createElement('div',{style:{fontSize:12,fontWeight:700,padding:'8px 12px',borderRadius:6,background:'rgba(0,0,0,0.3)',color:momResult.accuracy>=65?G:momResult.accuracy>=50?A:R}},
+          momResult.verdict==='BUILD'?'PROCEED — momentum strategy works, build the scanner':
+          momResult.verdict==='TUNE'?'PROMISING — moderate edge, try different lookback period':
+          'WEAK — momentum not working on this universe/period'
+        ),
+        React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginTop:8,lineHeight:1.8}},momResult.note)
+      ):null,
       valResult?React.createElement('div',null,
         React.createElement('div',{style:{background:valResult.composite.accuracy>=80?'#052e16':valResult.composite.accuracy>=65?'#2d1e00':'#2d0a0a',border:'1px solid '+(valResult.composite.accuracy>=80?'#00e67644':valResult.composite.accuracy>=65?'#ffb30044':'#ff444444'),borderRadius:12,padding:14,marginBottom:10}},
           React.createElement('div',{style:{fontSize:9,color:'#8899bb',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:6}},'Combined accuracy — '+valHold+' day hold, win > '+valMin+'%'),
