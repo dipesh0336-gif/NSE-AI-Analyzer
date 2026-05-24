@@ -102,36 +102,52 @@ function StockSearch({onSelect, selected, onClear}) {
 
 function LevelChart({data}) {
   if (!data) return null;
-  const {price, pdh, pdl, pdc, orHigh, orLow, vwap, entry, stop, target, signal} = data;
+  const {price, pdh, pdl, pdc, orHigh, orLow, vwap, entry, stop, target} = data;
   const allPrices = [pdh, pdl, pdc, orHigh, orLow, vwap, price, entry, stop, target].filter(Boolean);
-  const minP = Math.min(...allPrices) * 0.9995;
-  const maxP = Math.max(...allPrices) * 1.0005;
+  const minP = Math.min(...allPrices) * 0.998;
+  const maxP = Math.max(...allPrices) * 1.002;
   const range = maxP - minP || 1;
-  const pct = v => v ? ((v - minP) / range * 100) : 0;
+  const pct = v => v ? Math.min(94, Math.max(4, ((v - minP) / range * 100))) : 0;
 
   const levels = [
-    {label:'PDH', val:pdh, color:R, dash:true},
     {label:'OR High', val:orHigh, color:A, dash:false},
+    {label:'PDH', val:pdh, color:R, dash:true},
     {label:'VWAP', val:vwap, color:B, dash:true},
     {label:'PDC', val:pdc, color:'#8899bb', dash:true},
-    {label:'OR Low', val:orLow, color:A, dash:false},
     {label:'PDL', val:pdl, color:G, dash:true},
+    {label:'OR Low', val:orLow, color:A, dash:false},
   ];
   if (target) levels.push({label:'Target', val:target, color:G, dash:false, bold:true});
   if (stop) levels.push({label:'Stop', val:stop, color:R, dash:false, bold:true});
 
-  return React.createElement('div',{style:{position:'relative',height:200,background:'#0d1520',borderRadius:8,padding:'8px 4px 8px 70px',overflow:'hidden'}},
-    // Draw level lines
-    levels.map(l=>l.val?React.createElement('div',{key:l.label,style:{position:'absolute',left:70,right:4,top:pct(l.val)+'%',borderTop:'1px '+(l.dash?'dashed':'solid')+' '+l.color,opacity:0.7}},
-      React.createElement('span',{style:{position:'absolute',left:-66,top:-9,fontSize:9,color:l.color,fontWeight:l.bold?700:400,whiteSpace:'nowrap'}},l.label+' '+l.val.toFixed(1))
-    ):null),
-    // Current price marker
-    React.createElement('div',{style:{position:'absolute',left:70,right:4,top:pct(price)+'%',borderTop:'2px solid #e2e8f0',zIndex:2}},
-      React.createElement('div',{style:{position:'absolute',left:-66,top:-11,fontSize:10,color:'#e2e8f0',fontWeight:700,whiteSpace:'nowrap'}},'Price '+price.toFixed(1)),
-      React.createElement('div',{style:{position:'absolute',right:0,top:-8,width:8,height:8,borderRadius:'50%',background:'#e2e8f0',marginRight:2}})
+  // Anti-collision: sort descending by value, nudge labels that are too close
+  const sorted = levels.filter(l=>l.val).sort((a,b)=>b.val-a.val);
+  const labelPos = {};
+  const minGap = 8;
+  sorted.forEach((l,i) => {
+    let pos = pct(l.val);
+    if (i > 0) {
+      const prevLabel = sorted[i-1].label;
+      const prevPos = labelPos[prevLabel];
+      if (pos - prevPos < minGap) pos = prevPos + minGap;
+    }
+    labelPos[l.label] = pos;
+  });
+
+  return React.createElement('div',{style:{position:'relative',height:250,background:'#0d1520',borderRadius:8,padding:'6px 6px 6px 4px',overflow:'hidden'}},
+    levels.filter(l=>l.val).map(l =>
+      React.createElement('div',{key:l.label},
+        React.createElement('div',{style:{position:'absolute',left:72,right:6,top:pct(l.val)+'%',borderTop:'1px '+(l.dash?'dashed':'solid')+' '+l.color,opacity:0.55}}),
+        React.createElement('div',{style:{position:'absolute',left:2,top:'calc('+labelPos[l.label]+'% - 7px)',fontSize:9,color:l.color,fontWeight:l.bold?700:400,whiteSpace:'nowrap',lineHeight:1.1}},
+          l.label+' '+l.val.toFixed(1))
+      )
     ),
-    // Entry marker if exists
-    entry?React.createElement('div',{style:{position:'absolute',left:70,right:4,top:pct(entry)+'%',borderTop:'2px solid '+G,zIndex:3,opacity:0.9}}):null
+    React.createElement('div',{style:{position:'absolute',left:72,right:6,top:pct(price)+'%',borderTop:'2px solid #e2e8f0',zIndex:5}},
+      React.createElement('div',{style:{position:'absolute',right:0,top:-5,width:8,height:8,borderRadius:'50%',background:'#e2e8f0',marginRight:2}})
+    ),
+    React.createElement('div',{style:{position:'absolute',left:2,top:'calc('+pct(price)+'% - 8px)',fontSize:10,color:'#e2e8f0',fontWeight:700,whiteSpace:'nowrap',zIndex:6}},
+      'Rs '+price.toFixed(1)),
+    entry?React.createElement('div',{style:{position:'absolute',left:72,right:6,top:pct(entry)+'%',borderTop:'2px solid '+G,zIndex:4,opacity:0.9}}):null
   );
 }
 
