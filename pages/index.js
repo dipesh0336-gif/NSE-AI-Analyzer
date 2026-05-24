@@ -125,7 +125,7 @@ function LevelChart({data}) {
   var maxV = Math.max.apply(null, allVals);
   var span = maxV - minV || 1;
 
-  // Add 15% padding so labels at extremes don't get clipped
+  // Add 15% padding so labels at extremes do not get clipped
   var padded = span * 0.15;
   var minVp = minV - padded;
   var maxVp = maxV + padded;
