@@ -123,34 +123,55 @@ const HDRS = {
   'Accept':'application/json','Referer':'https://finance.yahoo.com',
 };
 
+async function fetchQuote(sym) {
+  // Use v8/chart endpoint (same as Analyze Stock - confirmed working)
+  try {
+    const r = await fetch(
+      'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=5d',
+      { headers: HDRS }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    const res = j?.chart?.result?.[0];
+    if (!res) return null;
+    const q = res.indicators.quote[0];
+    const meta = res.meta;
+    const n = q.close.length - 1;
+    // Get valid last close
+    let lastClose = null, prevClose = null;
+    for (let i = n; i >= 0; i--) { if (q.close[i] != null) { lastClose = q.close[i]; break; } }
+    for (let i = n-1; i >= 0; i--) { if (q.close[i] != null) { prevClose = q.close[i]; break; } }
+    if (!lastClose) return null;
+    prevClose = prevClose || lastClose;
+    const price = meta.regularMarketPrice || lastClose;
+    const open = q.open[n] || price;
+    const dayHigh = q.high[n] || price;
+    const dayLow = q.low[n] || price;
+    const volume = q.volume[n] || 0;
+    // Avg volume from last 10 days
+    const vols = q.volume.filter(v => v != null && v > 0);
+    const avgVolume = vols.length > 0 ? vols.reduce((a,b)=>a+b,0)/vols.length : 100000;
+    const changePct = prevClose > 0 ? (price - prevClose)/prevClose*100 : 0;
+    return { price, prevClose, dayHigh, dayLow, volume, avgVolume, changePct, change: price-prevClose, open };
+  } catch(e) { return null; }
+}
+
 async function batchQuotes(syms) {
   const out = {};
-  const chunks = [];
-  for (let i = 0; i < syms.length; i += 100) chunks.push(syms.slice(i, i+100));
-  await Promise.all(chunks.map(async chunk => {
-    try {
-      const r = await fetch('https://query1.finance.yahoo.com/v7/finance/quote?symbols='+chunk.join(','), { headers: HDRS });
-      if (!r.ok) return;
-      const j = await r.json();
-      (j?.quoteResponse?.result || []).forEach(q => {
-        if (q.symbol && q.regularMarketPrice) {
-          out[q.symbol] = {
-            price: q.regularMarketPrice,
-            prevClose: q.regularMarketPreviousClose || q.regularMarketPrice,
-            dayHigh: q.regularMarketDayHigh || q.regularMarketPrice,
-            dayLow: q.regularMarketDayLow || q.regularMarketPrice,
-            volume: q.regularMarketVolume || 0,
-            avgVolume: q.averageDailyVolume10Day || q.averageDailyVolume3Month || 100000,
-            changePct: q.regularMarketChangePercent || 0,
-            change: q.regularMarketChange || 0,
-            open: q.regularMarketOpen || q.regularMarketPrice,
-          };
-        }
-      });
-    } catch(e) {}
-  }));
+  // Fetch in parallel batches of 8 using the working v8/chart endpoint
+  const batchSize = 8;
+  for (let i = 0; i < syms.length; i += batchSize) {
+    const batch = syms.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(s => fetchQuote(s)));
+    batch.forEach((sym, idx) => {
+      if (results[idx]) out[sym] = results[idx];
+    });
+    if (i + batchSize < syms.length) await new Promise(r => setTimeout(r, 100));
+  }
   return out;
+  // placeholder closing brace below
 }
+
 
 async function intraday15m(sym) {
   try {
