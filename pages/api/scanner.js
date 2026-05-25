@@ -205,11 +205,11 @@ function analyzeORB(sym, q, d, niftyTrend) {
     const avgV = d.volumes.slice(0, Math.min(8, d.volumes.length)).reduce((a,b)=>a+b,0) / Math.min(8, d.volumes.length);
 
     for (let i = orN; i < d.closes.length; i++) {
-      if (d.closes[i] > orH && d.volumes[i] > avgV * 1.3) {
+      if (d.closes[i] > orH && d.volumes[i] > avgV * 1.1) {
         breakDir = 'LONG'; breakBar = i;
         orConfirmed = true; break;
       }
-      if (d.closes[i] < orL && d.volumes[i] > avgV * 1.3) {
+      if (d.closes[i] < orL && d.volumes[i] > avgV * 1.1) {
         breakDir = 'SHORT'; breakBar = i;
         orConfirmed = true; break;
       }
@@ -264,7 +264,16 @@ function analyzeORB(sym, q, d, niftyTrend) {
     }
   }
 
-  if (direction === 'NEUTRAL') return null;
+  if (direction === 'NEUTRAL') {
+    // Still return WATCH if price is making a meaningful move
+    const pctMove = Math.abs(q.changePct || 0);
+    if (pctMove > 0.4 && orH && orL) {
+      conviction = Math.min(30, Math.round(pctMove * 10));
+      reasons.push('Price moved ' + pctMove.toFixed(2) + '% - watch for ORB at Rs ' + (q.changePct > 0 ? orH.toFixed(1) : orL.toFixed(1)));
+    } else {
+      return null;
+    }
+  }
 
   const rrRatio = entry && stop && target ? Math.abs((target - entry) / (entry - stop)) : null;
 
@@ -311,7 +320,7 @@ export default async function handler(req, res) {
     const candidates = NIFTY500
       .filter(s => quotes[s])
       .map(s => ({ s, score: phase1Score(s, quotes[s]) }))
-      .filter(x => x.score >= 30)
+      .filter(x => x.score >= 20)
       .sort((a, b) => b.score - a.score)
       .slice(0, 50);
 
