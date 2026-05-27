@@ -620,13 +620,23 @@ export default function Home() {
   },[tab,trades.length]);
 
   async function runAdScan(){
-    var syms=adWatchlist.split(/[,\n\s]+/).map(function(s){return s.trim().toUpperCase();}).filter(function(s){return s.length>1;});
-    if(!syms.length){setAdScanErr('Please enter at least one stock symbol');return;}
+    // Parse symbols - handle comma, newline, space separated
+    var raw=adWatchlist.trim();
+    if(!raw){setAdScanErr('Please enter at least one stock symbol');return;}
+    var syms=raw.split(/[,\n\r\s]+/)
+      .map(function(s){return s.trim().toUpperCase().replace(/\.NS$/,'');})
+      .filter(function(s){return s.length>=2;});
+    // Remove duplicates
+    syms=[...new Set(syms)];
+    if(!syms.length){setAdScanErr('No valid symbols found. Enter symbols like: EIHOTEL, COALINDIA, DIVISLAB');return;}
     setAdScanLoading(true);setAdScanErr('');setAdScanData(null);
     try{
-      var r=await fetch('/api/scanner?symbols='+syms.join(',')+'&mode=watchlist');
+      var url='/api/scanner?mode=watchlist&symbols='+encodeURIComponent(syms.join(','));
+      var r=await fetch(url);
       var j=await r.json();
       if(!r.ok||j.error)throw new Error(j.error||'Scan failed');
+      // Attach the original symbols requested so we can show missing ones
+      j.requestedSyms=syms;
       setAdScanData(j);
     }catch(e){setAdScanErr(e.message);}
     setAdScanLoading(false);
@@ -818,13 +828,14 @@ export default function Home() {
 
       adScanData?React.createElement('div',null,
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:10,padding:'8px 12px',marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'center'}},
-          React.createElement('div',{style:{fontSize:11,color:'#8899bb'}},'Scanned '+adScanData.totalScanned+' watchlist stocks'),
+          React.createElement('div',{style:{fontSize:11,color:'#8899bb'}},(adScanData.requestedSyms||[]).length+' stocks scanned · '+(adScanData.results.filter(function(r){return r.direction==='LONG';}).length)+' LONG signals'),
           React.createElement('div',{style:{fontSize:11,fontWeight:700,color:adScanData.niftyTrend==='BULLISH'?G:adScanData.niftyTrend==='BEARISH'?R:A}},'Nifty '+adScanData.niftyTrend+' '+(adScanData.niftyChange>=0?'+':'')+adScanData.niftyChange+'%')
         ),
         adScanData.results.length===0?
-          React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:20,textAlign:'center'}},
-            React.createElement('div',{style:{fontSize:14,color:A,marginBottom:6}},'No ORB breakouts yet'),
-            React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.8}},'Watchlist stocks have not broken out of Opening Range yet. Check back after 10am IST or wait for volume confirmation.')
+          React.createElement('div',{style:{background:'#111827',border:'1px solid #ffb30033',borderRadius:12,padding:16,textAlign:'center'}},
+            React.createElement('div',{style:{fontSize:13,color:A,marginBottom:6,fontWeight:700}},'No ORB breakouts yet'),
+            React.createElement('div',{style:{fontSize:11,color:'#8899bb',lineHeight:1.8,marginBottom:8}},'Your watchlist stocks scanned: '+(adScanData.requestedSyms||[]).join(', ')),
+            React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.8}},'None have broken out of their Opening Range yet. Best time to check: 9:30am - 11:30am IST during market hours.')
           ):
           React.createElement('div',null,
             React.createElement('div',{style:{background:'#052e16',border:'1px solid #00e67633',borderRadius:8,padding:'8px 12px',marginBottom:10,fontSize:11,color:G,fontWeight:600}},
