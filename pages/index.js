@@ -585,6 +585,21 @@ export default function Home() {
     }catch(e){}
   }
 
+  // Load saved AD watchlist from localStorage
+  React.useEffect(function(){
+    try {
+      var saved = localStorage.getItem('adWatchlist');
+      if (saved) setAdWatchlist(saved);
+    } catch(e) {}
+  }, []);
+
+  // Save watchlist to localStorage whenever it changes
+  React.useEffect(function(){
+    try {
+      if (adWatchlist) localStorage.setItem('adWatchlist', adWatchlist);
+    } catch(e) {}
+  }, [adWatchlist]);
+
   // Auto-refresh trade prices every 60 seconds when on trades tab
   React.useEffect(function(){
     if(tab!=='trades')return;
@@ -807,18 +822,24 @@ export default function Home() {
           React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginLeft:'auto'}},'Powered by tradingpartner.online')
         ),
         React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.7,marginBottom:10}},'Paste stocks showing Bullish Divergence from tradingpartner.online. Scanner checks them for ORB breakouts next morning.'),
-        React.createElement('textarea',{
-          value:adWatchlist,
-          onChange:function(e){setAdWatchlist(e.target.value);},
-          placeholder:'EIHOTEL, COROMANDEL, DIVISLAB - Paste symbols from tradingpartner.online',
-          rows:5,
-          style:{width:'100%',background:'#0d1520',border:'1px solid #1e2d45',borderRadius:8,color:'#e2e8f0',fontSize:12,padding:'10px 12px',fontFamily:'monospace',outline:'none',resize:'none',marginBottom:8}
-        }),
+        React.createElement('div',{style:{position:'relative',marginBottom:8}},
+          React.createElement('textarea',{
+            value:adWatchlist,
+            onChange:function(e){setAdWatchlist(e.target.value);},
+            placeholder:'EIHOTEL, COROMANDEL, DIVISLAB - Paste symbols from tradingpartner.online',
+            rows:5,
+            style:{width:'100%',background:'#0d1520',border:'1px solid #1e2d45',borderRadius:8,color:'#e2e8f0',fontSize:12,padding:'10px 12px',fontFamily:'monospace',outline:'none',resize:'none'}
+          }),
+          adWatchlist?React.createElement('div',{style:{fontSize:9,color:'#00e676',marginTop:4,textAlign:'right'}},'Auto-saved'):null
+        ),
         React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8}},
           React.createElement('button',{onClick:runAdScan,disabled:adScanLoading,
             style:{padding:13,background:'#ce93d8',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:adScanLoading?0.4:1}
           },adScanLoading?'Scanning watchlist...':'SCAN AD WATCHLIST'),
-          React.createElement('button',{onClick:function(){setAdWatchlist('');setAdScanData(null);setAdScanErr('');},
+          React.createElement('button',{onClick:function(){
+            setAdWatchlist('');setAdScanData(null);setAdScanErr('');
+            try{localStorage.removeItem('adWatchlist');}catch(e){}
+          },
             style:{padding:13,background:'#1a2235',color:'#4a6080',border:'1px solid #1e2d45',borderRadius:10,fontFamily:'sans-serif',fontSize:13,fontWeight:600,cursor:'pointer'}
           },'Clear')
         )
