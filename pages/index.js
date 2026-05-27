@@ -665,14 +665,14 @@ export default function Home() {
             React.createElement('option',{value:'SHORT'},'SHORT')
           )
         ),
-        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}},
-          React.createElement('input',{placeholder:'Entry',value:tradeEntry,onChange:function(e){setTradeEntry(e.target.value);},type:'number',
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}},
+          React.createElement('input',{placeholder:'Entry price',value:tradeEntry,onChange:function(e){setTradeEntry(e.target.value);},type:'number',
             style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#e2e8f0',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}}),
-          React.createElement('input',{placeholder:'Stop',value:tradeStop,onChange:function(e){setTradeStop(e.target.value);},type:'number',
-            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#ff4444',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}}),
-          React.createElement('input',{placeholder:'Target',value:tradeTarget,onChange:function(e){setTradeTarget(e.target.value);},type:'number',
-            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#00e676',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}})
+          React.createElement('input',{placeholder:'Stop loss',value:tradeStop,onChange:function(e){setTradeStop(e.target.value);},type:'number',
+            style:{background:'#0d1520',border:'1px solid #ff444455',borderRadius:6,color:'#ff4444',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}})
         ),
+        React.createElement('input',{placeholder:'Target price',value:tradeTarget,onChange:function(e){setTradeTarget(e.target.value);},type:'number',
+          style:{width:'100%',background:'#0d1520',border:'1px solid #00e67655',borderRadius:6,color:'#00e676',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none',marginBottom:8}}),
         React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:6}},
           React.createElement('button',{onClick:addTrade,style:{padding:'10px',background:G,color:'#000',border:'none',borderRadius:8,fontFamily:'sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}},'+ ADD TRADE'),
           React.createElement('button',{onClick:refreshPrices,disabled:autoRefreshing,style:{padding:'10px',background:'#1a2235',color:B,border:'1px solid '+B,borderRadius:8,fontFamily:'sans-serif',fontSize:11,fontWeight:600,cursor:'pointer',opacity:autoRefreshing?0.6:1}},autoRefreshing?'REFRESHING...':'AUTO '+refreshCountdown+'s')
