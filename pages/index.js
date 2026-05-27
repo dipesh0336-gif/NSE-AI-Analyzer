@@ -278,6 +278,8 @@ export default function Home() {
   const [tradeSym,setTradeSym]=useState('');
   const [tradeDir,setTradeDir]=useState('LONG');
   const [tradePrices,setTradePrices]=useState({});
+  const [refreshCountdown,setRefreshCountdown]=useState(60);
+  const [autoRefreshing,setAutoRefreshing]=useState(false);
   const [valMethod,setValMethod]=useState('pattern');
   const [momLookback,setMomLookback]=useState('20');
   const [momResult,setMomResult]=useState(null);
@@ -357,6 +359,7 @@ export default function Home() {
   async function refreshPrices(){
     var syms=[...new Set(trades.map(function(t){return t.sym+'.NS';}))];
     if(!syms.length)return;
+    setAutoRefreshing(true);
     var updated={};
     await Promise.all(syms.map(async function(sym){
       try{
@@ -366,7 +369,40 @@ export default function Home() {
       }catch(e){}
     }));
     setTradePrices(function(prev){return Object.assign({},prev,updated);});
+    setAutoRefreshing(false);
+    setRefreshCountdown(60);
   }
+
+  // Auto-refresh trade prices every 60 seconds when on trades tab
+  React.useEffect(function(){
+    if(tab!=='trades'||trades.length===0)return;
+    setRefreshCountdown(60);
+    var countdown=60;
+    var timer=setInterval(function(){
+      countdown--;
+      setRefreshCountdown(countdown);
+      if(countdown<=0){
+        countdown=60;
+        setRefreshCountdown(60);
+        setAutoRefreshing(true);
+        var syms=[...new Set(trades.map(function(t){return t.sym+'.NS';}))];
+        Promise.all(syms.map(async function(sym){
+          try{
+            var r=await fetch('/api/market?symbol='+sym.replace('.NS','')+'&type=stock&interval=15min');
+            var j=await r.json();
+            if(j&&j.price)return{sym:sym.replace('.NS',''),price:j.price};
+          }catch(e){}
+          return null;
+        })).then(function(results){
+          var updated={};
+          results.forEach(function(r){if(r)updated[r.sym]=r.price;});
+          setTradePrices(function(prev){return Object.assign({},prev,updated);});
+          setAutoRefreshing(false);
+        });
+      }
+    },1000);
+    return function(){clearInterval(timer);};
+  },[tab,trades.length]);
 
   const instrSelector=React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
     React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}},
@@ -606,7 +642,7 @@ export default function Home() {
         ),
         React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:6}},
           React.createElement('button',{onClick:addTrade,style:{padding:'10px',background:G,color:'#000',border:'none',borderRadius:8,fontFamily:'sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}},'+ ADD TRADE'),
-          React.createElement('button',{onClick:refreshPrices,style:{padding:'10px',background:'#1a2235',color:B,border:'1px solid '+B,borderRadius:8,fontFamily:'sans-serif',fontSize:12,fontWeight:600,cursor:'pointer'}},'REFRESH')
+          React.createElement('button',{onClick:refreshPrices,disabled:autoRefreshing,style:{padding:'10px',background:'#1a2235',color:B,border:'1px solid '+B,borderRadius:8,fontFamily:'sans-serif',fontSize:11,fontWeight:600,cursor:'pointer',opacity:autoRefreshing?0.6:1}},autoRefreshing?'REFRESHING...':'AUTO '+refreshCountdown+'s')
         )
       ),
       trades.length===0?React.createElement('div',{style:{fontSize:12,color:'#4a6080',textAlign:'center',padding:'30px 0',lineHeight:2}},'No trades logged yet. Add a trade above to track it live. Get signals from the Scanner tab.'):
