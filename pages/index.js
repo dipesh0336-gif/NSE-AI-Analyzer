@@ -1,4 +1,4 @@
-'use client';
+'use client'; // v2.1
 import React, { useState, useEffect } from 'react';
 
 const NSE_STOCKS = [
@@ -443,7 +443,7 @@ export default function Home() {
     )
   );
 
-  return React.createElement('div',{style:{background:'#0a0e1a',minHeight:'100vh',color:'#e2e8f0',fontFamily:'monospace',paddingBottom:60}},
+  return React.createElement('div',{style:{background:'#0a0e1a',minHeight:'100vh',color:'#e2e8f0',fontFamily:'monospace',paddingBottom:60,maxWidth:'100vw',overflowX:'hidden'}},
     React.createElement('style',null,'*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#2a3f5f;border-radius:2px}@keyframes spin{to{transform:rotate(360deg)}}@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}'),
 
     (loading||scanLoading)?React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(10,14,26,0.95)',zIndex:9999,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}},
