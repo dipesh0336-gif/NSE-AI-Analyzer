@@ -271,6 +271,13 @@ export default function Home() {
   const [valUniverse,setValUniverse]=useState('top20');
   const [valHold,setValHold]=useState('10');
   const [valMin,setValMin]=useState('5');
+  const [trades,setTrades]=useState([]);
+  const [tradeEntry,setTradeEntry]=useState('');
+  const [tradeStop,setTradeStop]=useState('');
+  const [tradeTarget,setTradeTarget]=useState('');
+  const [tradeSym,setTradeSym]=useState('');
+  const [tradeDir,setTradeDir]=useState('LONG');
+  const [tradePrices,setTradePrices]=useState({});
   const [valMethod,setValMethod]=useState('pattern');
   const [momLookback,setMomLookback]=useState('20');
   const [momResult,setMomResult]=useState(null);
@@ -333,6 +340,34 @@ export default function Home() {
     setValLoading(false);
   }
 
+  function addTrade(){
+    if(!tradeSym||!tradeEntry||!tradeStop||!tradeTarget)return;
+    const t={
+      id:Date.now(),sym:tradeSym.toUpperCase(),dir:tradeDir,
+      entry:parseFloat(tradeEntry),stop:parseFloat(tradeStop),
+      target:parseFloat(tradeTarget),time:new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'}),
+      current:parseFloat(tradeEntry),status:'OPEN'
+    };
+    setTrades(function(prev){return[t,...prev];});
+    setTradeSym('');setTradeEntry('');setTradeStop('');setTradeTarget('');
+  }
+
+  function removeTrade(id){setTrades(function(prev){return prev.filter(function(t){return t.id!==id;});});}
+
+  async function refreshPrices(){
+    var syms=[...new Set(trades.map(function(t){return t.sym+'.NS';}))];
+    if(!syms.length)return;
+    var updated={};
+    await Promise.all(syms.map(async function(sym){
+      try{
+        var r=await fetch('/api/market?symbol='+sym.replace('.NS','')+'&type=stock&interval=15min');
+        var j=await r.json();
+        if(j&&j.price)updated[sym.replace('.NS','')]=j.price;
+      }catch(e){}
+    }));
+    setTradePrices(function(prev){return Object.assign({},prev,updated);});
+  }
+
   const instrSelector=React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
     React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}},
       React.createElement('div',null,
@@ -379,7 +414,7 @@ export default function Home() {
 
     // TABS
     React.createElement('div',{style:{display:'flex',background:'#111827',borderBottom:'1px solid #1e2d45'}},
-      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['backtest','Backtest'],['validate','Validate']].map(function(tabItem){
+      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['backtest','Backtest'],['validate','Validate'],['trades','Trades']].map(function(tabItem){
         var t=tabItem[0]; var label=tabItem[1];
         const active=tab===t;
         return React.createElement('button',{key:t,onClick:()=>setTab(t),style:{flex:1,padding:'10px 4px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.08em',fontFamily:'monospace'}},label);
@@ -550,6 +585,72 @@ export default function Home() {
       ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select instrument above and\ntap RUN BACKTEST to see\nORB strategy accuracy\nover recent trading sessions.')
     ):null,
 
+    tab==='trades'?React.createElement('div',{style:{padding:'10px 12px 20px'}},
+      React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
+        React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',marginBottom:8}},'Log New Trade'),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}},
+          React.createElement('input',{placeholder:'Symbol (e.g. RELIANCE)',value:tradeSym,onChange:function(e){setTradeSym(e.target.value.toUpperCase());},
+            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#e2e8f0',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}}),
+          React.createElement('select',{value:tradeDir,onChange:function(e){setTradeDir(e.target.value);},style:sel},
+            React.createElement('option',{value:'LONG'},'LONG'),
+            React.createElement('option',{value:'SHORT'},'SHORT')
+          )
+        ),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}},
+          React.createElement('input',{placeholder:'Entry',value:tradeEntry,onChange:function(e){setTradeEntry(e.target.value);},type:'number',
+            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#e2e8f0',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}}),
+          React.createElement('input',{placeholder:'Stop',value:tradeStop,onChange:function(e){setTradeStop(e.target.value);},type:'number',
+            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#ff4444',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}}),
+          React.createElement('input',{placeholder:'Target',value:tradeTarget,onChange:function(e){setTradeTarget(e.target.value);},type:'number',
+            style:{background:'#0d1520',border:'1px solid #1e2d45',borderRadius:6,color:'#00e676',fontSize:12,padding:'8px 10px',fontFamily:'monospace',outline:'none'}})
+        ),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'2fr 1fr',gap:6}},
+          React.createElement('button',{onClick:addTrade,style:{padding:'10px',background:G,color:'#000',border:'none',borderRadius:8,fontFamily:'sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}},'+ ADD TRADE'),
+          React.createElement('button',{onClick:refreshPrices,style:{padding:'10px',background:'#1a2235',color:B,border:'1px solid '+B,borderRadius:8,fontFamily:'sans-serif',fontSize:12,fontWeight:600,cursor:'pointer'}},'REFRESH')
+        )
+      ),
+      trades.length===0?React.createElement('div',{style:{fontSize:12,color:'#4a6080',textAlign:'center',padding:'30px 0',lineHeight:2}},'No trades logged yet. Add a trade above to track it live. Get signals from the Scanner tab.'):
+      React.createElement('div',null,
+        trades.map(function(t){
+          var curr=tradePrices[t.sym]||t.entry;
+          var pnlPct=t.dir==='LONG'?(curr-t.entry)/t.entry*100:(t.entry-curr)/t.entry*100;
+          var distToStop=t.dir==='LONG'?(curr-t.stop)/t.stop*100:(t.stop-curr)/t.stop*100;
+          var distToTarget=t.dir==='LONG'?(t.target-curr)/curr*100:(curr-t.target)/curr*100;
+          var atRisk=distToStop<0.8&&distToStop>=0;
+          var stopHit=distToStop<0;
+          var targetHit=distToTarget<=0;
+          var borderColor=stopHit?R:atRisk?A:targetHit?G:'#1e2d45';
+          return React.createElement('div',{key:t.id,style:{background:'#111827',border:'1px solid '+borderColor,borderRadius:12,padding:12,marginBottom:8}},
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
+              React.createElement('div',null,
+                React.createElement('div',{style:{fontSize:13,fontWeight:700,color:'#e2e8f0'}},t.sym),
+                React.createElement('div',{style:{fontSize:10,color:t.dir==='LONG'?G:R}},'Entry '+t.time+' · '+t.dir)
+              ),
+              React.createElement('div',{style:{textAlign:'right'}},
+                React.createElement('div',{style:{fontSize:16,fontWeight:700,color:pnlPct>=0?G:R}},(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%'),
+                React.createElement('div',{style:{fontSize:10,color:'#4a6080'}},'Rs '+(curr||t.entry).toFixed(1))
+              )
+            ),
+            React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}},
+              [['Entry',t.entry,'#e2e8f0'],['Stop',t.stop,R],['Target',t.target,G]].map(function(x){
+                return React.createElement('div',{key:x[0],style:{background:'#0d1520',borderRadius:6,padding:'6px 8px',textAlign:'center'}},
+                  React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase'}},x[0]),
+                  React.createElement('div',{style:{fontSize:12,fontWeight:600,color:x[2]}},'Rs '+x[1])
+                );
+              })
+            ),
+            stopHit?React.createElement('div',{style:{background:'#2d0a0a',border:'1px solid #ff444455',borderRadius:6,padding:'8px 10px',fontSize:11,color:R,fontWeight:600,marginBottom:6}},'STOP LOSS HIT — Exit immediately at Rs '+t.stop):
+            atRisk?React.createElement('div',{style:{background:'#2d1e00',border:'1px solid #ffb30055',borderRadius:6,padding:'8px 10px',fontSize:11,color:A,fontWeight:600,marginBottom:6}},'WARNING — Price within 0.8% of stop loss Rs '+t.stop+'. Consider exiting.'):
+            targetHit?React.createElement('div',{style:{background:'#052e16',border:'1px solid #00e67655',borderRadius:6,padding:'8px 10px',fontSize:11,color:G,fontWeight:600,marginBottom:6}},'TARGET REACHED — Consider booking profits at Rs '+t.target):null,
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontSize:10,color:'#4a6080',marginBottom:6}},
+              React.createElement('span',null,'Stop: '+(distToStop>=0?'+'+distToStop.toFixed(1)+'% away':Math.abs(distToStop).toFixed(1)+'% BELOW')),
+              React.createElement('span',null,'Target: '+(distToTarget>0?distToTarget.toFixed(1)+'% away':'REACHED'))
+            ),
+            React.createElement('button',{onClick:function(){removeTrade(t.id);},style:{width:'100%',padding:'6px',background:'transparent',border:'1px solid #1e2d45',borderRadius:6,color:'#4a6080',fontSize:11,cursor:'pointer'}},'Remove trade')
+          );
+        })
+      )
+    ):null,
     tab==='validate'?React.createElement('div',{style:{padding:'10px 12px 20px'}},
       React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
         React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',marginBottom:8}},'Pattern Validation Settings'),
