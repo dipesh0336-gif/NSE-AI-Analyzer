@@ -280,6 +280,7 @@ export default function Home() {
   const [tradePrices,setTradePrices]=useState({});
   const [refreshCountdown,setRefreshCountdown]=useState(60);
   const [autoRefreshing,setAutoRefreshing]=useState(false);
+  const [niftyLive,setNiftyLive]=useState(null);
   const [valMethod,setValMethod]=useState('pattern');
   const [momLookback,setMomLookback]=useState('20');
   const [momResult,setMomResult]=useState(null);
@@ -373,9 +374,22 @@ export default function Home() {
     setRefreshCountdown(60);
   }
 
+  // Fetch Nifty live data
+  async function fetchNiftyLive(){
+    try{
+      var r=await fetch('/api/market?symbol=NIFTY&type=index&interval=15min');
+      var j=await r.json();
+      if(j&&j.price){
+        setNiftyLive({price:j.price,change:j.change||0,changePct:j.changePct||0,trend:j.niftyTrend?j.niftyTrend.trend:'NEUTRAL'});
+      }
+    }catch(e){}
+  }
+
   // Auto-refresh trade prices every 60 seconds when on trades tab
   React.useEffect(function(){
-    if(tab!=='trades'||trades.length===0)return;
+    if(tab!=='trades')return;
+    fetchNiftyLive();
+    if(trades.length===0)return;
     setRefreshCountdown(60);
     var countdown=60;
     var timer=setInterval(function(){
@@ -385,6 +399,7 @@ export default function Home() {
         countdown=60;
         setRefreshCountdown(60);
         setAutoRefreshing(true);
+        fetchNiftyLive();
         var syms=[...new Set(trades.map(function(t){return t.sym+'.NS';}))];
         Promise.all(syms.map(async function(sym){
           try{
@@ -622,6 +637,24 @@ export default function Home() {
     ):null,
 
     tab==='trades'?React.createElement('div',{style:{padding:'10px 12px 20px'}},
+      niftyLive?React.createElement('div',{
+        style:{
+          background:niftyLive.changePct<-0.3?'#2d0a0a':niftyLive.changePct>0.3?'#052e16':'#111827',
+          border:'1px solid '+(niftyLive.changePct<-0.3?'#ff444455':niftyLive.changePct>0.3?'#00e67655':'#1e2d45'),
+          borderRadius:12,padding:'10px 14px',marginBottom:10,
+          display:'flex',justifyContent:'space-between',alignItems:'center'
+        }
+      },
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:2}},'Nifty 50 Live'),
+          React.createElement('div',{style:{fontSize:20,fontWeight:700,color:'#e2e8f0',fontFamily:'sans-serif'}},niftyLive.price.toLocaleString('en-IN'))
+        ),
+        React.createElement('div',{style:{textAlign:'right'}},
+          React.createElement('div',{style:{fontSize:18,fontWeight:700,color:niftyLive.changePct<-0.3?'#ff4444':niftyLive.changePct>0.3?'#00e676':'#ffb300'}},(niftyLive.changePct>=0?'+':'')+niftyLive.changePct.toFixed(2)+'%'),
+          React.createElement('div',{style:{fontSize:11,fontWeight:600,color:niftyLive.changePct<-0.3?'#ff4444':niftyLive.changePct>0.3?'#00e676':'#ffb300'}},niftyLive.trend),
+          niftyLive.changePct<-0.3?React.createElement('div',{style:{fontSize:10,color:'#ff4444',marginTop:2,fontWeight:600}},'EXIT LONGS'):null
+        )
+      ):null,
       React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
         React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',marginBottom:8}},'Log New Trade'),
         React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}},
