@@ -213,7 +213,7 @@ function phase1Score(sym, q) {
   return s;
 }
 
-function analyzeORB(sym, q, d, niftyTrend) {
+function analyzeORB(sym, q, d, niftyTrend, niftyChangeVal) {
   const vr = q.volume / (q.avgVolume || 1);
   let orH, orL, orConfirmed = false, breakDir = null, breakBar = null, vwapVal = null;
   let entry, stop, target;
@@ -239,29 +239,61 @@ function analyzeORB(sym, q, d, niftyTrend) {
 
   let direction = 'NEUTRAL', conviction = 0, reasons = [];
 
-  if (orConfirmed && breakDir === 'LONG' && q.price > q.prevClose) {
+  // FILTER 1: Market regime — suppress LONG if Nifty bearish
+  const niftyChangePct = niftyChangeVal || 0;
+  if (orConfirmed && breakDir === 'LONG' && q.price > q.prevClose && niftyChangePct > -0.3) {
     direction = 'LONG';
     const bvRatio = d.volumes[breakBar] / (d.volumes.slice(0,breakBar).reduce((a,b)=>a+b,0)/Math.max(1,breakBar));
     conviction = 45;
+
+    // FILTER 2: Strong bar confirmation — breakout bar must close in top 40% of its range
+    const bBar = breakBar || (d.closes.length - 1);
+    const barRange = d.highs[bBar] - d.lows[bBar];
+    const barClose = d.closes[bBar];
+    const barLow = d.lows[bBar];
+    const closeStrength = barRange > 0 ? (barClose - barLow) / barRange : 0.5;
+    if (closeStrength >= 0.6) { conviction += 15; reasons.push('Strong breakout bar — closed in top ' + Math.round((1-closeStrength)*100) + '% of range'); }
+    else if (closeStrength < 0.4) { conviction -= 10; reasons.push('Weak bar close — potential bull trap'); }
+
     if (bvRatio > 2) { conviction += 20; reasons.push('Strong volume ' + bvRatio.toFixed(1) + 'x on ORB breakout'); }
     else { conviction += 10; reasons.push('Volume confirmed ORB breakout above Rs ' + orH.toFixed(1)); }
     if (q.price > q.prevClose * 1.005) { conviction += 15; reasons.push('Above PDH Rs ' + (q.prevClose).toFixed(1) + ' - prior session bias bullish'); }
     if (vwapVal && q.price > vwapVal) { conviction += 10; reasons.push('Price above VWAP Rs ' + vwapVal.toFixed(1)); }
-    if (niftyTrend === 'BULLISH') { conviction += 10; reasons.push('Nifty ' + niftyTrend + ' - market tailwind'); }
+    if (niftyTrend === 'BULLISH') { conviction += 10; reasons.push('Nifty BULLISH — market tailwind'); }
+    else if (niftyChangePct < -0.1) { conviction -= 5; reasons.push('Nifty slightly weak — reduce size'); }
     if (vr > 2) { conviction += 5; reasons.push('Day volume ' + vr.toFixed(1) + 'x avg'); }
+
+    // FILTER 3: Time filter — signals after 1:30pm IST have lower follow-through
+    const istHour = new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'numeric',hour12:false});
+    const hour = parseInt(istHour);
+    if (hour >= 13) { conviction -= 15; reasons.push('Late signal (after 1:30pm) — lower follow-through'); }
+
     entry = parseFloat(q.price.toFixed(2));
     stop = parseFloat(orL.toFixed(2));
     target = parseFloat((q.price + (q.price - orL) * 2).toFixed(2));
-  } else if (orConfirmed && breakDir === 'SHORT' && q.price < q.prevClose) {
+  } else if (orConfirmed && breakDir === 'SHORT' && q.price < q.prevClose && niftyChangePct < 0.3) {
     direction = 'SHORT';
-    const bvRatio = d.volumes[breakBar] / (d.volumes.slice(0,breakBar).reduce((a,b)=>a+b,0)/Math.max(1,breakBar));
+    const bvRatioS = d.volumes[breakBar] / (d.volumes.slice(0,breakBar).reduce((a,b)=>a+b,0)/Math.max(1,breakBar));
     conviction = 45;
-    if (bvRatio > 2) { conviction += 20; reasons.push('Strong volume ' + bvRatio.toFixed(1) + 'x on ORB breakdown'); }
-    else { conviction += 10; reasons.push('Volume confirmed ORB breakdown below Rs ' + orL.toFixed(1)); }
-    if (q.price < q.prevClose * 0.995) { conviction += 15; reasons.push('Below PDL - prior session bias bearish'); }
+
+    // Strong bar for SHORT — close in bottom 40% of range
+    const bBarS = breakBar || (d.closes.length - 1);
+    const barRangeS = d.highs[bBarS] - d.lows[bBarS];
+    const closeStrengthS = barRangeS > 0 ? (d.closes[bBarS] - d.lows[bBarS]) / barRangeS : 0.5;
+    if (closeStrengthS <= 0.4) { conviction += 15; reasons.push('Strong breakdown bar — closed in bottom ' + Math.round(closeStrengthS*100) + '% of range'); }
+    else if (closeStrengthS > 0.6) { conviction -= 10; reasons.push('Weak bar close — potential bear trap'); }
+
+    if (bvRatioS > 2) { conviction += 20; reasons.push('Strong volume ' + bvRatioS.toFixed(1) + 'x on breakdown'); }
+    else { conviction += 10; reasons.push('Volume confirmed breakdown below Rs ' + orL.toFixed(1)); }
+    if (q.price < q.prevClose * 0.995) { conviction += 15; reasons.push('Below PDL — prior session bias bearish'); }
     if (vwapVal && q.price < vwapVal) { conviction += 10; reasons.push('Price below VWAP Rs ' + vwapVal.toFixed(1)); }
-    if (niftyTrend === 'BEARISH') { conviction += 10; reasons.push('Nifty ' + niftyTrend + ' - market headwind'); }
+    if (niftyTrend === 'BEARISH') { conviction += 10; reasons.push('Nifty BEARISH — market tailwind for short'); }
+    else if (niftyChangePct > 0.1) { conviction -= 5; reasons.push('Nifty slightly strong — cover quickly'); }
     if (vr > 2) { conviction += 5; reasons.push('Day volume ' + vr.toFixed(1) + 'x avg'); }
+
+    const istHourS = new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour:'numeric',hour12:false});
+    if (parseInt(istHourS) >= 13) { conviction -= 15; reasons.push('Late signal (after 1:30pm) — lower follow-through'); }
+
     entry = parseFloat(q.price.toFixed(2));
     stop = parseFloat(orH.toFixed(2));
     target = parseFloat((q.price - (orH - q.price) * 2).toFixed(2));
