@@ -1,4 +1,5 @@
 niftypulse/config.py
+niftypulse/settings.py
 __pycache__/
 *.pyc
 .env
