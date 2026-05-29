@@ -1,6 +1,6 @@
 # regime.py — Nifty regime detection + reversal warning
 
-import config
+import settings as config
 
 def detect_regime(nifty_pct: float, banknifty_pct: float, vix_pct: float) -> dict:
     """

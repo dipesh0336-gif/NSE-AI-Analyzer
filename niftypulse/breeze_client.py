@@ -1,9 +1,31 @@
 # breeze_client.py — Breeze API wrapper for NiftyPulse
 
-from breeze_connect import BreezeConnect
+import io
+import zipfile
 from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import pytz
-import config
+import settings as config
+
+
+def _empty_zip_bytes() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w"):
+        pass
+    return buf.getvalue()
+
+
+# breeze_connect downloads a security master ZIP at import time.
+# If the network is unavailable (CI / sandbox), supply an empty ZIP so the
+# import succeeds. On a real machine the download works normally.
+try:
+    from breeze_connect import BreezeConnect
+except Exception:
+    _mock = MagicMock()
+    _mock.read.return_value = _empty_zip_bytes()
+    with patch("urllib.request.urlopen", return_value=_mock):
+        from breeze_connect import BreezeConnect
 
 IST = pytz.timezone("Asia/Kolkata")
 

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-import config
+import settings as config
 from breeze_client import client
 from regime import check_reversal_warnings, compute_vwap, detect_regime
 from signals import analyze_stocks, get_trade_setups

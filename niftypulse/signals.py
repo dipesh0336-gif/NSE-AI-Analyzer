@@ -1,6 +1,6 @@
 # signals.py — Leading stocks scanner + momentum scoring
 
-import config
+import settings as config
 from regime import compute_vwap
 
 def compute_rs(stock_pct: float, nifty_pct: float) -> float:
