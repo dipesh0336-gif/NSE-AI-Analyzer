@@ -1,0 +1,6 @@
+niftypulse/config.py
+__pycache__/
+*.pyc
+.env
+node_modules/
+.next/
