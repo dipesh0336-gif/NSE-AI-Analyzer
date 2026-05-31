@@ -387,7 +387,32 @@ async function handleWatchlist(req, res) {
     const d = await intraday15m(nseSym);
     if (!d) return;
     const setup = analyzeORB(nseSym, q, d, niftyTrend.trend, niftyChange);
-    if (setup) results.push(setup);
+    if (setup) {
+      // CONTRARIAN LOGIC: if scanner says SHORT but stock has AD accumulation
+      // (it's on our watchlist) → flip to CONTRARIAN_LONG
+      if (setup.direction === 'SHORT') {
+        const risk = setup.stop - setup.entry; // for short, stop > entry
+        const target = parseFloat((setup.entry - risk * 2).toFixed(2));
+        results.push({
+          ...setup,
+          direction: 'CONTRARIAN_LONG',
+          conviction: Math.min(85, setup.conviction - 10),
+          entry: setup.entry,
+          stop: parseFloat((setup.entry * 0.985).toFixed(2)), // 1.5% stop below entry
+          target: parseFloat((setup.entry * 1.03).toFixed(2)), // 3% target
+          rr: 2,
+          isWatchlist: true,
+          reasons: [
+            'AD accumulation confirmed on tradingpartner.online',
+            'ORB showing SHORT — but AD divergence suggests institutional buying',
+            'Contrarian LONG: price weakness = better entry for the AD play',
+            ...setup.reasons.slice(0,1)
+          ],
+        });
+      } else {
+        results.push({...setup, isWatchlist: true});
+      }
+    }
     else {
       // Always include watchlist stocks even if no ORB signal yet
       results.push({
@@ -401,6 +426,7 @@ async function handleWatchlist(req, res) {
         entry: null, stop: null, target: null, rr: null,
         reasons: ['No ORB breakout yet — price inside opening range. Monitor for breakout above OR High.'],
         isNifty50: false,
+        isWatchlist: true,
       });
     }
   }));
