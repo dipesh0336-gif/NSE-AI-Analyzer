@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>NiftyPulse</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0a0e1a;color:#e2e8f0;font-family:monospace;min-height:100vh;padding-bottom:40px}
+.topbar{position:sticky;top:0;z-index:10;background:#0a0e1a;border-bottom:1px solid #1e2d45;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:sans-serif;font-size:18px;font-weight:800;color:#00e676}
+.logo span{color:#4fc3f7;font-size:11px;font-weight:400;margin-left:6px}
+.ist{font-size:10px;color:#8899bb}
+.badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px}
+.pad{padding:12px}
+.card{background:#111827;border:1px solid #1e2d45;border-radius:12px;padding:12px;margin-bottom:10px}
+.ct{font-size:9px;color:#4a6080;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px}
+input,button{font-family:monospace;outline:none}
+.inp{width:100%;background:#0d1520;border:1px solid #1e2d45;border-radius:8px;color:#e2e8f0;font-size:13px;padding:10px 12px;margin-bottom:8px}
+.btn{width:100%;padding:13px;background:#00e676;color:#000;border:none;border-radius:10px;font-family:sans-serif;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-sec{background:#1a2235;color:#4fc3f7;border:1px solid #4fc3f7}
+.regime-box{border-radius:12px;padding:14px;margin-bottom:10px;border:2px solid transparent}
+.regime-name{font-size:26px;font-weight:800;font-family:sans-serif;margin-bottom:4px}
+.regime-action{font-size:12px;line-height:1.6;opacity:0.85}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.metric{background:#0d1520;border-radius:8px;padding:8px 10px;text-align:center}
+.mv{font-size:16px;font-weight:700}
+.ml{font-size:9px;color:#4a6080;text-transform:uppercase;margin-top:2px}
+.stock-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a2235}
+.stock-row:last-child{border-bottom:none}
+.sn{font-size:12px;font-weight:700;color:#e2e8f0}
+.ss{font-size:10px;color:#4a6080;margin-top:1px}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px}
+.warn-box{border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:11px;line-height:1.7}
+.setup-card{background:#0d1520;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid #00e676}
+.setup-sym{font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:4px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:6px}
+.lv{background:#0a0e1a;border-radius:5px;padding:5px 6px;text-align:center}
+.lv-l{font-size:8px;color:#4a6080;text-transform:uppercase}
+.lv-v{font-size:11px;font-weight:600}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #1e2d45;border-top-color:#00e676;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.pulse{animation:pulse 2s infinite}
+.score-bar{height:6px;background:#1a2235;border-radius:3px;overflow:hidden;margin-top:4px}
+.score-fill{height:100%;border-radius:3px;transition:width 0.5s}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="logo">NiftyPulse <span>BREEZE POWERED</span></div>
+  </div>
+  <div style="text-align:right">
+    <div class="ist" id="ist">--:--:--</div>
+    <div id="mktBadge" class="badge" style="background:#2d0a0a;color:#ff4444;margin-top:2px">CLOSED</div>
+  </div>
+</div>
+
+<div class="pad">
+
+<!-- CONNECTION -->
+<div id="connectSection" class="card">
+  <div class="ct">Connect to Breeze API</div>
+  <div style="font-size:11px;color:#4a6080;margin-bottom:10px;line-height:1.7">
+    1. Open the login URL below in browser<br>
+    2. Login with ICICI Direct credentials<br>
+    3. Copy session token from redirected URL<br>
+    4. Paste below and tap Connect
+  </div>
+  <button class="btn btn-sec" onclick="openLoginUrl()" style="margin-bottom:8px">OPEN BREEZE LOGIN URL</button>
+  <input class="inp" id="sessionToken" placeholder="Paste session token here..." />
+  <button class="btn" id="connectBtn" onclick="connect()">CONNECT TO BREEZE</button>
+  <div id="connectErr" style="font-size:11px;color:#ff4444;display:none;margin-top:4px"></div>
+</div>
+
+<!-- MAIN CONTENT (hidden until connected) -->
+<div id="mainContent" style="display:none">
+
+  <!-- REFRESH BUTTON -->
+  <button class="btn" id="refreshBtn" onclick="refresh()" style="background:#4fc3f7;margin-bottom:10px">
+    REFRESH DATA
+  </button>
+
+  <!-- REGIME -->
+  <div id="regimeBox" class="regime-box"></div>
+
+  <!-- INDEX LEVELS -->
+  <div class="grid3" id="indexGrid"></div>
+
+  <!-- REVERSAL WARNINGS -->
+  <div id="warningsSection"></div>
+
+  <!-- TRADE SETUPS -->
+  <div id="setupsSection"></div>
+
+  <!-- STOCKS TABLE -->
+  <div class="card">
+    <div class="ct">Nifty Top 15 — Live Momentum</div>
+    <div id="stocksTable"></div>
+  </div>
+
+  <div style="font-size:10px;color:#4a6080;text-align:center;margin-top:4px" id="lastUpdate">Not yet updated</div>
+</div>
+
+</div>
+
+<script>
+const G='#00e676',R='#ff4444',A='#ffb300',B='#4fc3f7';
+
+// Clock
+setInterval(()=>{
+  const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  document.getElementById('ist').textContent=
+    String(ist.getHours()).padStart(2,'0')+':'+
+    String(ist.getMinutes()).padStart(2,'0')+':'+
+    String(ist.getSeconds()).padStart(2,'0');
+  const m=ist.getHours()*60+ist.getMinutes(),d=ist.getDay();
+  const b=document.getElementById('mktBadge');
+  if(d>=1&&d<=5&&m>=555&&m<930){
+    b.textContent='MARKET OPEN';b.style.background='#00391a';b.style.color='#00e676';
+  } else {
+    b.textContent='CLOSED';b.style.background='#2d0a0a';b.style.color='#ff4444';
+  }
+},1000);
+
+async function openLoginUrl(){
+  const r=await fetch('/api/login-url');
+  const j=await r.json();
+  window.open(j.url,'_blank');
+}
+
+async function connect(){
+  const token=document.getElementById('sessionToken').value.trim();
+  if(!token){showErr('Please paste your session token');return;}
+  const btn=document.getElementById('connectBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Connecting...';
+  try{
+    const r=await fetch('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_token:token})});
+    const j=await r.json();
+    if(j.status==='connected'){
+      document.getElementById('connectSection').style.display='none';
+      document.getElementById('mainContent').style.display='block';
+      await refresh();
+      setInterval(autoRefresh,30000);
+    } else {
+      showErr(j.detail||'Connection failed');
+    }
+  }catch(e){showErr(e.message);}
+  btn.disabled=false;btn.innerHTML='CONNECT TO BREEZE';
+}
+
+function showErr(msg){
+  const e=document.getElementById('connectErr');
+  e.textContent=msg;e.style.display='block';
+}
+
+async function refresh(){
+  const btn=document.getElementById('refreshBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Refreshing...';
+  try{
+    await fetch('/api/refresh',{method:'POST'});
+    await loadPulse();
+  }catch(e){console.error(e);}
+  btn.disabled=false;btn.innerHTML='REFRESH DATA';
+}
+
+async function autoRefresh(){
+  try{await loadPulse();}catch(e){}
+}
+
+async function loadPulse(){
+  const r=await fetch('/api/pulse');
+  const d=await r.json();
+  if(d.error){console.log(d.error);return;}
+  renderRegime(d.regime);
+  renderIndex(d.nifty,d.banknifty,d.vix);
+  renderWarnings(d.warnings);
+  renderSetups(d.setups||[]);
+  renderStocks(d.stocks||[],d.regime);
+  if(d.last_update) document.getElementById('lastUpdate').textContent='Last update: '+d.last_update+' IST';
+}
+
+function renderRegime(r){
+  if(!r)return;
+  const box=document.getElementById('regimeBox');
+  const bg=r.color+'22';
+  const border=r.color+'66';
+  box.style.background=bg;
+  box.style.borderColor=border;
+  box.innerHTML=`
+    <div style="font-size:9px;color:#8899bb;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Market Regime</div>
+    <div class="regime-name" style="color:${r.color}">${r.regime}</div>
+    <div style="display:flex;gap:8px;margin:6px 0;align-items:center">
+      <div style="font-size:11px;color:#8899bb">Nifty <span style="color:${r.nifty_pct>=0?G:R};font-weight:700">${r.nifty_pct>=0?'+':''}${r.nifty_pct}%</span></div>
+      <div style="font-size:11px;color:#8899bb">BankNifty <span style="color:${r.banknifty_pct>=0?G:R};font-weight:700">${r.banknifty_pct>=0?'+':''}${r.banknifty_pct}%</span></div>
+      <div style="font-size:11px;color:#8899bb">VIX <span style="color:${r.vix_pct>3?R:r.vix_pct>0?A:G};font-weight:700">${r.vix_pct>=0?'+':''}${r.vix_pct}%</span></div>
+    </div>
+    <div class="regime-action" style="color:${r.color}">${r.action}</div>
+    <div style="margin-top:8px">
+      <div style="height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden">
+        <div style="height:100%;border-radius:3px;width:${r.confidence}%;background:${r.color};transition:width 1s"></div>
+      </div>
+      <div style="font-size:9px;color:#8899bb;margin-top:3px">${r.confidence}% confidence</div>
+    </div>`;
+}
+
+function renderIndex(nifty,bnifty,vix){
+  const g=document.getElementById('indexGrid');
+  const items=[
+    [nifty,'Nifty 50'],
+    [bnifty,'Bank Nifty'],
+    [vix,'India VIX'],
+  ];
+  g.innerHTML=items.map(([d,label])=>!d?'':
+    `<div class="metric">
+      <div class="mv" style="color:${d.change_pct>=0?G:R}">${(d.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+      <div style="font-size:10px;color:${d.change_pct>=0?G:R}">${d.change_pct>=0?'+':''}${(d.change_pct||0).toFixed(2)}%</div>
+      <div class="ml">${label}</div>
+    </div>`
+  ).join('');
+}
+
+function renderWarnings(w){
+  const sec=document.getElementById('warningsSection');
+  if(!w||w.level===0){sec.innerHTML='';return;}
+  const colors=['','#ffb300','#ff8a65','#ff4444'];
+  const bgs=['','#2d1e00','#2d1200','#2d0a0a'];
+  sec.innerHTML=`
+    <div class="warn-box" style="background:${bgs[w.level]};border:1px solid ${colors[w.level]}44;color:${colors[w.level]}">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">${w.level>=3?'🚨':'⚠'} ${w.summary}</div>
+      ${(w.warnings||[]).map(ww=>`<div style="margin-bottom:4px">Signal ${ww.signal}: ${ww.detail}</div>`).join('')}
+    </div>`;
+}
+
+function renderSetups(setups){
+  const sec=document.getElementById('setupsSection');
+  if(!setups.length){sec.innerHTML='';return;}
+  sec.innerHTML=`
+    <div class="card" style="border-color:#00e67633">
+      <div class="ct">Top Trade Setups — AD + ORB Confirmed</div>
+      ${setups.map(s=>`
+        <div class="setup-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <div class="setup-sym">${s.symbol}</div>
+              <div style="font-size:10px;color:#4a6080">${s.name} · ${s.sector}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="background:#052e16;color:#00e676;border:1px solid #00e67633;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">LONG</div>
+              <div style="font-size:10px;color:#00e676;margin-top:2px">${s.conviction}% conviction</div>
+            </div>
+          </div>
+          <div class="grid4">
+            ${[['Entry','Rs '+s.entry,'#e2e8f0'],['Stop','Rs '+s.stop,'#ff4444'],['Target','Rs '+s.target,'#00e676'],['R:R',s.rr+':1','#4fc3f7']].map(x=>`
+              <div class="lv">
+                <div class="lv-l">${x[0]}</div>
+                <div class="lv-v" style="color:${x[2]}">${x[1]}</div>
+              </div>`).join('')}
+          </div>
+          <div style="font-size:10px;color:#8899bb;line-height:1.6">${s.reason}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderStocks(stocks,regimeData){
+  const tbl=document.getElementById('stocksTable');
+  if(!stocks.length){tbl.innerHTML='<div style="font-size:11px;color:#4a6080;padding:8px 0">Waiting for data...</div>';return;}
+  const regime=regimeData?regimeData.regime:'NEUTRAL';
+  tbl.innerHTML=stocks.map(s=>{
+    const c=s.signal==='LONG'?G:s.signal==='AVOID'?R:A;
+    const scoreW=Math.abs(s.score);
+    const scoreC=s.score>0?G:R;
+    return `
+    <div class="stock-row">
+      <div>
+        <div class="sn">${s.symbol}</div>
+        <div class="ss">${s.name} · ${s.weight}%</div>
+        <div class="score-bar" style="width:80px">
+          <div class="score-fill" style="width:${scoreW}%;background:${scoreC}"></div>
+        </div>
+      </div>
+      <div style="text-align:center;min-width:55px">
+        <div style="font-size:11px;font-weight:600;color:${s.change_pct>=0?G:R}">${s.change_pct>=0?'+':''}${s.change_pct}%</div>
+        <div style="font-size:9px;color:#4a6080">RS ${s.rs>=0?'+':''}${s.rs}</div>
+        <div style="font-size:9px;color:${s.above_vwap?G:R}">${s.above_vwap?'▲VWAP':'▼VWAP'}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="tag" style="background:${c}22;color:${c};border:1px solid ${c}44">${s.signal}</div>
+        <div style="font-size:9px;color:#4a6080;margin-top:3px">Vol ${s.volume_ratio}x</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
