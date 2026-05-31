@@ -454,6 +454,8 @@ export default function Home() {
   const [scanData,setScanData]=useState(null);
   const [scanLoading,setScanLoading]=useState(false);
   const [scanErr,setScanErr]=useState('');
+  const [btContraData,setBtContraData]=useState(null);
+  const [btContraLoading,setBtContraLoading]=useState(false);
   const [valLoading,setValLoading]=useState(false);
   const [valResult,setValResult]=useState(null);
   const [valErr,setValErr]=useState('');
@@ -926,6 +928,22 @@ export default function Home() {
         setLoading(false);setStep('');
       },disabled:loading||(instrType==='stock'&&!stock),style:{width:'100%',padding:13,background:'#4fc3f7',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:(loading||(instrType==='stock'&&!stock))?0.35:1,marginBottom:10}},
         'RUN BACKTEST'
+      ),
+      React.createElement('button',{onClick:async()=>{
+        const symbol=instrType==='index'?idx.s:(stock?stock.s:null);
+        const type=instrType==='index'?'index':'stock';
+        if(!symbol){setErr('Please select a stock.');return;}
+        setBtContraLoading(true);setErr('');setBtContraData(null);
+        try{
+          setStep('Running contrarian backtest...');
+          const r=await fetch('/api/backtest?symbol='+encodeURIComponent(symbol)+'&type='+type+'&interval='+intv+'&mode=contrarian');
+          const j=await r.json();
+          if(!r.ok||j.error)throw new Error(j.error);
+          setBtContraData({_backtest:j});
+        }catch(e){setErr(e.message);}
+        setBtContraLoading(false);setStep('');
+      },disabled:btContraLoading||(instrType==='stock'&&!stock),style:{width:'100%',padding:13,background:'#ce93d8',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:(btContraLoading||(instrType==='stock'&&!stock))?0.35:1,marginBottom:10}},
+        btContraLoading?'Running contrarian...':'RUN CONTRARIAN BACKTEST'
       ),
       err?React.createElement('div',{style:{fontSize:11,color:R,padding:'10px 12px',background:'#2d0a0a',border:'1px solid #ff444433',borderRadius:8,marginBottom:10}},'Error: '+err):null,
       mktData&&mktData._backtest?React.createElement('div',null,
