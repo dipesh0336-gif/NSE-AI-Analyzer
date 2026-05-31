@@ -821,7 +821,17 @@ export default function Home() {
           React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#e2e8f0'}},'AD Watch Scanner'),
           React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginLeft:'auto'}},'Powered by tradingpartner.online')
         ),
-        React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.7,marginBottom:10}},'Paste stocks showing Bullish Divergence from tradingpartner.online. Scanner checks them for ORB breakouts next morning.'),
+        React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.7,marginBottom:6}},'Paste stocks showing Bullish Divergence from tradingpartner.online. Scanner checks for ORB breakouts.'),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:10}},
+          React.createElement('div',{style:{background:'#052e16',borderRadius:8,padding:'8px 10px',fontSize:10,color:G,lineHeight:1.6}},
+            React.createElement('div',{style:{fontWeight:700,marginBottom:2}},'AD + ORB'),
+            'Both systems agree — highest conviction LONG'
+          ),
+          React.createElement('div',{style:{background:'#2d1040',borderRadius:8,padding:'8px 10px',fontSize:10,color:'#ce93d8',lineHeight:1.6}},
+            React.createElement('div',{style:{fontWeight:700,marginBottom:2}},'Contrarian LONG'),
+            'ORB says SHORT but AD says BUY — price weakness = better entry'
+          )
+        ),
         React.createElement('div',{style:{position:'relative',marginBottom:8}},
           React.createElement('textarea',{
             value:adWatchlist,
@@ -849,7 +859,7 @@ export default function Home() {
 
       adScanData?React.createElement('div',null,
         React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:10,padding:'8px 12px',marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'center'}},
-          React.createElement('div',{style:{fontSize:11,color:'#8899bb'}},(adScanData.requestedSyms||[]).length+' stocks scanned · '+(adScanData.results.filter(function(r){return r.direction==='LONG';}).length)+' LONG signals'),
+          React.createElement('div',{style:{fontSize:11,color:'#8899bb'}},(adScanData.requestedSyms||[]).length+' stocks scanned · '+(adScanData.results.filter(function(r){return r.direction==='LONG';}).length)+' LONG · '+(adScanData.results.filter(function(r){return r.direction==='CONTRARIAN_LONG';}).length)+' Contrarian'),
           React.createElement('div',{style:{fontSize:11,fontWeight:700,color:adScanData.niftyTrend==='BULLISH'?G:adScanData.niftyTrend==='BEARISH'?R:A}},'Nifty '+adScanData.niftyTrend+' '+(adScanData.niftyChange>=0?'+':'')+adScanData.niftyChange+'%')
         ),
         adScanData.results.length===0?
@@ -864,20 +874,23 @@ export default function Home() {
             ),
             adScanData.results.map(function(r,i){
               var isLong=r.direction==='LONG';
+              var isContra=r.direction==='CONTRARIAN_LONG';
               var isWatch=r.direction.startsWith('WATCH');
-              var dc=isLong?G:isWatch?A:R;
-              var dbg=isLong?'#052e16':isWatch?'#2d1e00':'#2d0a0a';
-              return React.createElement('div',{key:r.symbol+i,style:{background:'#111827',border:'2px solid '+(isLong?G:isWatch?A+'44':'#1e2d45'),borderRadius:12,padding:12,marginBottom:8}},
+              var dc=isLong?G:isContra?'#ce93d8':isWatch?A:R;
+              var dbg=isLong?'#052e16':isContra?'#2d1040':isWatch?'#2d1e00':'#2d0a0a';
+              var borderC=isLong?G:isContra?'#ce93d8':isWatch?A+'44':'#1e2d45';
+              return React.createElement('div',{key:r.symbol+i,style:{background:'#111827',border:'2px solid '+borderC,borderRadius:12,padding:12,marginBottom:8}},
                 React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}},
                   React.createElement('div',null,
-                    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6}},
+                    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}},
                       React.createElement('div',{style:{fontSize:14,fontWeight:700,color:'#e2e8f0'}},r.symbol),
-                      isLong?React.createElement('div',{style:{fontSize:9,background:'#052e16',color:G,border:'1px solid #00e67633',borderRadius:3,padding:'2px 6px',fontWeight:700}},'AD + ORB'):null
+                      isLong?React.createElement('div',{style:{fontSize:9,background:'#052e16',color:G,border:'1px solid #00e67633',borderRadius:3,padding:'2px 6px',fontWeight:700}},'AD + ORB'):null,
+                      isContra?React.createElement('div',{style:{fontSize:9,background:'#2d1040',color:'#ce93d8',border:'1px solid #ce93d844',borderRadius:3,padding:'2px 6px',fontWeight:700}},'CONTRARIAN'):null
                     ),
                     React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginTop:2}},r.name+' · '+r.sector)
                   ),
                   React.createElement('div',{style:{textAlign:'right'}},
-                    React.createElement('div',{style:{background:dbg,borderRadius:4,padding:'2px 8px',fontSize:11,fontWeight:700,color:dc,marginBottom:2}},r.direction),
+                    React.createElement('div',{style:{background:dbg,borderRadius:4,padding:'2px 8px',fontSize:11,fontWeight:700,color:dc,marginBottom:2}},isContra?'LONG ↗':r.direction),
                     React.createElement('div',{style:{fontSize:10,color:dc}},r.conviction+'% conviction')
                   )
                 ),
