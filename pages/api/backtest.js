@@ -192,6 +192,15 @@ export default async function handler(req, res) {
     var startIdx=Math.max(30, d.closes.length-200); // last 200 bars max
 
     for(var i=startIdx;i<d.closes.length-1;i++){
+      // Only test during market hours 9:15am - 2:30pm IST
+      var barTime = new Date(d.timestamps[i] * 1000);
+      var istHour = barTime.getUTCHours() + 5;
+      var istMin  = barTime.getUTCMinutes() + 30;
+      if (istMin >= 60) { istHour++; istMin -= 60; }
+      var istMins = istHour * 60 + istMin;
+      // 9:15am = 555 mins, 2:30pm = 870 mins
+      if (istMins < 555 || istMins > 870) continue;
+
       var hC=d.closes.slice(0,i+1),hH=d.highs.slice(0,i+1),hL=d.lows.slice(0,i+1),hO=d.opens.slice(0,i+1),hV=d.volumes.slice(0,i+1);
       var pred=predictBar(hO,hH,hL,hC,hV);
 
