@@ -478,6 +478,9 @@ export default function Home() {
   const [valMethod,setValMethod]=useState('pattern');
   const [momLookback,setMomLookback]=useState('20');
   const [momResult,setMomResult]=useState(null);
+  const [rankLoading,setRankLoading]=useState(false);
+  const [rankData,setRankData]=useState(null);
+  const [rankErr,setRankErr]=useState('');
 
   useEffect(()=>{
     const tick=()=>{
@@ -634,6 +637,17 @@ export default function Home() {
     return function(){clearInterval(timer);};
   },[tab,trades.length]);
 
+  async function runRankings(){
+    setRankLoading(true);setRankErr('');setRankData(null);
+    try{
+      var r=await fetch('/api/nifty50-analysis');
+      var j=await r.json();
+      if(!r.ok||j.error)throw new Error(j.error||'Analysis failed');
+      setRankData(j);
+    }catch(e){setRankErr(e.message);}
+    setRankLoading(false);
+  }
+
   async function runAdScan(){
     // Parse symbols - handle comma, newline, space separated
     var raw=adWatchlist.trim();
@@ -684,9 +698,9 @@ export default function Home() {
   return React.createElement('div',{style:{background:'#0a0e1a',minHeight:'100vh',color:'#e2e8f0',fontFamily:'monospace',paddingBottom:60,maxWidth:'100vw',overflowX:'hidden'}},
     React.createElement('style',null,'*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#2a3f5f;border-radius:2px}@keyframes spin{to{transform:rotate(360deg)}}@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}'),
 
-    (loading||scanLoading)?React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(10,14,26,0.95)',zIndex:9999,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}},
+    (loading||scanLoading||rankLoading)?React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(10,14,26,0.95)',zIndex:9999,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}},
       React.createElement('div',{style:{width:44,height:44,border:'3px solid #1e2d45',borderTopColor:G,borderRadius:'50%',animation:'spin 0.8s linear infinite'}}),
-      React.createElement('div',{style:{fontSize:13,color:'#8899bb',textAlign:'center',padding:'0 24px'}},scanLoading?'Scanning Nifty 500 stocks...':step)
+      React.createElement('div',{style:{fontSize:13,color:'#8899bb',textAlign:'center',padding:'0 24px'}},scanLoading?'Scanning Nifty 500 stocks...':rankLoading?'Analysing all 49 Nifty 50 stocks (~30s)...':step)
     ):null,
 
     // TOPBAR
@@ -703,7 +717,7 @@ export default function Home() {
 
     // TABS
     React.createElement('div',{style:{display:'flex',background:'#111827',borderBottom:'1px solid #1e2d45',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
-      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['adwatch','AD Watch'],['trades','Trades'],['validate','Validate']].map(function(tabItem){
+      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['adwatch','AD Watch'],['trades','Trades'],['validate','Validate'],['rankings','N50 Rankings']].map(function(tabItem){
         var t=tabItem[0]; var label=tabItem[1];
         const active=tab===t;
         return React.createElement('button',{key:t,onClick:()=>setTab(t),style:{flex:'0 0 auto',padding:'10px 10px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'monospace',whiteSpace:'nowrap'}},label);
@@ -1164,6 +1178,91 @@ export default function Home() {
         ),
         React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8}},'Tested: '+valResult.stocksDone+' stocks · '+valHold+'d hold · Win >'+valMin+'% · Yahoo Finance NSE data')
       ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Select settings above and tap RUN PATTERN VALIDATION to test the 5 pre-breakout patterns on real historical NSE data.')
+    ):null,
+
+    tab==='rankings'?React.createElement('div',{style:{padding:'12px 12px 20px'}},
+      React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:12,padding:12,marginBottom:10}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#e2e8f0',marginBottom:4}},'Nifty 50 Stock Rankings'),
+        React.createElement('div',{style:{fontSize:11,color:'#4a6080',lineHeight:1.7,marginBottom:10}},'Ranks all 49 Nifty 50 stocks by: Pattern Win Rate (50%) + Relative Strength vs Nifty (30%) + Current Pattern Score (20%). Backtested on 6 months of daily data.'),
+        React.createElement('button',{onClick:runRankings,disabled:rankLoading,style:{width:'100%',padding:13,background:'#4fc3f7',color:'#000',border:'none',borderRadius:10,fontFamily:'sans-serif',fontSize:14,fontWeight:800,cursor:'pointer',opacity:rankLoading?0.4:1}},
+          rankLoading?'Analysing 49 stocks...':'RUN NIFTY 50 ANALYSIS'
+        )
+      ),
+      rankErr?React.createElement('div',{style:{fontSize:11,color:R,padding:'10px 12px',background:'#2d0a0a',border:'1px solid #ff444433',borderRadius:8,marginBottom:10}},'Error: '+rankErr):null,
+
+      rankData?React.createElement('div',null,
+        // Summary bar
+        React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}},
+          React.createElement('div',{style:{fontSize:11,color:'#8899bb'}},
+            rankData.analyzed+' stocks · '+rankData.ranked.filter(function(r){return r.verdict==='TRADE';}).length+' TRADE · '+rankData.ranked.filter(function(r){return r.verdict==='WATCH';}).length+' WATCH'
+          ),
+          React.createElement('div',{style:{display:'flex',gap:12,alignItems:'center'}},
+            rankData.nifty.change20d!==null?React.createElement('div',{style:{fontSize:11,color:rankData.nifty.change20d>0?G:R,fontWeight:600}},'Nifty 20d '+(rankData.nifty.change20d>0?'+':'')+rankData.nifty.change20d+'%'):null,
+            React.createElement('div',{style:{fontSize:10,color:'#4a6080'}},rankData.timestamp)
+          )
+        ),
+
+        // Momentum picks box
+        rankData.momentumPicks&&rankData.momentumPicks.length>0?React.createElement('div',{style:{background:'#0d1c2e',border:'1px solid #4fc3f744',borderRadius:10,padding:12,marginBottom:10}},
+          React.createElement('div',{style:{fontSize:9,color:B,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8,fontWeight:700}},'Top 5 Momentum Picks (highest RS vs Nifty)'),
+          React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6}},
+            rankData.momentumPicks.map(function(m){
+              return React.createElement('div',{key:m.symbol,style:{background:'rgba(79,195,247,0.1)',border:'1px solid #4fc3f744',borderRadius:8,padding:'7px 10px',minWidth:80}},
+                React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#e2e8f0'}}),
+                React.createElement('div',{style:{fontSize:12,fontWeight:700,color:'#e2e8f0'}},m.symbol),
+                React.createElement('div',{style:{fontSize:9,color:'#4a6080',marginTop:1}},m.sector),
+                React.createElement('div',{style:{fontSize:11,fontWeight:600,color:B,marginTop:3}},(m.rs20d>=0?'+':'')+m.rs20d+'% RS')
+              );
+            })
+          )
+        ):null,
+
+        // Rankings table
+        React.createElement('div',{style:{background:'#111827',border:'1px solid #1e2d45',borderRadius:10,padding:12,marginBottom:10}},
+          React.createElement('div',{style:{fontSize:9,color:'#4a6080',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:8}},'Full Rankings'),
+          React.createElement('div',{style:{overflowX:'auto'}},
+            React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:11,minWidth:420}},
+              React.createElement('thead',null,
+                React.createElement('tr',{style:{borderBottom:'1px solid #1e2d45'}},
+                  ['#','Stock','Sector','Win%','RS20d','Score','Verdict'].map(function(h){
+                    return React.createElement('th',{key:h,style:{padding:'5px 6px',textAlign:'left',fontSize:9,color:'#4a6080',textTransform:'uppercase',whiteSpace:'nowrap',fontWeight:600}},h);
+                  })
+                )
+              ),
+              React.createElement('tbody',null,
+                rankData.ranked.map(function(r){
+                  var vc=r.verdict==='TRADE'?G:r.verdict==='WATCH'?A:'#4a6080';
+                  var vbg=r.verdict==='TRADE'?'#052e16':r.verdict==='WATCH'?'#2d1e00':'transparent';
+                  var rsc=r.rs20d===null?'#4a6080':r.rs20d>=3?G:r.rs20d<=-3?R:A;
+                  return React.createElement('tr',{key:r.symbol,style:{borderBottom:'1px solid #0f1825',background:r.verdict==='TRADE'?'rgba(0,230,118,0.03)':'transparent'}},
+                    React.createElement('td',{style:{padding:'7px 6px',color:'#4a6080',fontSize:10}},r.rank),
+                    React.createElement('td',{style:{padding:'7px 6px',whiteSpace:'nowrap'}},
+                      React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'#e2e8f0'}},r.symbol),
+                      React.createElement('div',{style:{fontSize:9,color:'#4a6080',marginTop:1}},r.name.length>16?r.name.slice(0,15)+'…':r.name)
+                    ),
+                    React.createElement('td',{style:{padding:'7px 6px',fontSize:9,color:'#4a6080',whiteSpace:'nowrap'}},r.sector),
+                    React.createElement('td',{style:{padding:'7px 6px',fontWeight:700,color:r.patternWinRate>=65?G:r.patternWinRate>=50?A:R}},
+                      r.hits>0?r.patternWinRate+'%':'--',
+                      React.createElement('div',{style:{fontSize:8,color:'#4a6080',fontWeight:400}},r.hits>0?r.hits+' signals':'no signals')
+                    ),
+                    React.createElement('td',{style:{padding:'7px 6px',fontWeight:600,color:rsc}},
+                      r.rs20d!==null?(r.rs20d>=0?'+':'')+r.rs20d+'%':'--'
+                    ),
+                    React.createElement('td',{style:{padding:'7px 6px',fontWeight:700,color:r.currentScore>=65?G:r.currentScore>=40?A:'#4a6080'}},
+                      r.currentScore>0?r.currentScore:'--'
+                    ),
+                    React.createElement('td',{style:{padding:'7px 6px'}},
+                      React.createElement('div',{style:{background:vbg,borderRadius:4,padding:'2px 6px',fontSize:9,fontWeight:700,color:vc,display:'inline-block',border:'1px solid '+vc+'44'}},r.verdict)
+                    )
+                  );
+                })
+              )
+            )
+          )
+        ),
+        rankData.errors&&rankData.errors.length>0?React.createElement('div',{style:{fontSize:10,color:'#4a6080',marginBottom:8}},'Skipped: '+rankData.errors.join(', ')):null,
+        React.createElement('div',{style:{fontSize:10,color:'#4a6080',lineHeight:1.8}},'Pattern backtest: composite score ≥ 65 → hold '+rankData.holdDays+' days → win if > '+rankData.minMove+'% gain · RS = stock return minus Nifty return over 20 days')
+      ):React.createElement('div',{style:{fontSize:12,color:'#4a6080',lineHeight:2,padding:'20px 0',textAlign:'center'}},'Tap RUN NIFTY 50 ANALYSIS to rank\nall Nifty 50 stocks by pattern quality,\nrelative strength vs Nifty, and\ncurrent setup strength.')
     ):null,
 
     React.createElement('div',{style:{fontSize:10,color:'#4a6080',padding:'6px 14px 10px',display:'flex',alignItems:'center',gap:6}},
