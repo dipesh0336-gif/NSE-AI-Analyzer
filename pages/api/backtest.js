@@ -153,6 +153,7 @@ async function fetchIntraday(symbol, interval) {
 }
 
 export default async function handler(req, res) {
+  const mode = req.query.mode || 'normal'; // 'normal' or 'contrarian'
   var symbol=req.query.symbol, type=req.query.type||'stock', interval=req.query.interval||'15min';
   if(!symbol)return res.status(400).json({error:'Symbol required'});
 
@@ -221,11 +222,18 @@ export default async function handler(req, res) {
         actualMove=changePct>0?'UP':'DOWN';
       }
 
+      // Contrarian mode: flip every signal
+      var tradedSignal = finalSignal;
+      if (mode === 'contrarian') {
+        if (finalSignal === 'LONG') tradedSignal = 'SHORT';
+        else if (finalSignal === 'SHORT') tradedSignal = 'LONG';
+      }
+
       var correct=null;
-      if(finalSignal==='LONG'&&actualMove==='UP')correct=true;
-      else if(finalSignal==='LONG'&&actualMove==='DOWN')correct=false;
-      else if(finalSignal==='SHORT'&&actualMove==='DOWN')correct=true;
-      else if(finalSignal==='SHORT'&&actualMove==='UP')correct=false;
+      if(tradedSignal==='LONG'&&actualMove==='UP')correct=true;
+      else if(tradedSignal==='LONG'&&actualMove==='DOWN')correct=false;
+      else if(tradedSignal==='SHORT'&&actualMove==='DOWN')correct=true;
+      else if(tradedSignal==='SHORT'&&actualMove==='UP')correct=false;
       // NEUTRAL or FLAT = skip
 
       var d2=new Date(d.timestamps[i]*1000);
@@ -255,6 +263,7 @@ export default async function handler(req, res) {
     var shortCorrect=shortDir.filter(function(r){return r.correct;});
 
     res.status(200).json({
+      mode: mode,
       symbol:symbol,
       interval:interval,
       totalBars:displayResults.length,
