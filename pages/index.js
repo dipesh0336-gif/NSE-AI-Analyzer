@@ -704,12 +704,21 @@ export default function Home() {
     ),
 
     // TABS
-    React.createElement('div',{style:{display:'flex',background:'#111827',borderBottom:'1px solid #1e2d45',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
-      [['scanner','Scanner'],['analyze','Analyze'],['backtest','Backtest'],['adwatch','AD Watch'],['trades','Trades'],['validate','Validate']].map(function(tabItem){
-        var t=tabItem[0]; var label=tabItem[1];
-        const active=tab===t;
-        return React.createElement('button',{key:t,onClick:()=>setTab(t),style:{flex:'0 0 auto',padding:'10px 10px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'monospace',whiteSpace:'nowrap'}},label);
-      })
+    React.createElement('div',{style:{background:'#111827',borderBottom:'1px solid #1e2d45'}},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr'}},
+        [['scanner','Scanner'],['analyze','Analyze'],['backtest','Backtest']].map(function(tabItem){
+          var t=tabItem[0]; var label=tabItem[1];
+          var active=tab===t;
+          return React.createElement('button',{key:t,onClick:function(){setTab(t);},style:{padding:'9px 4px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.05em',fontFamily:'monospace'}},label);
+        })
+      ),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',borderTop:'1px solid #1a2235'}},
+        [['adwatch','AD Watch'],['trades','Trades'],['validate','Validate']].map(function(tabItem){
+          var t=tabItem[0]; var label=tabItem[1];
+          var active=tab===t;
+          return React.createElement('button',{key:t,onClick:function(){setTab(t);},style:{padding:'9px 4px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.05em',fontFamily:'monospace'}},label);
+        })
+      )
     ),
 
     // SCANNER TAB
