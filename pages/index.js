@@ -705,7 +705,7 @@ export default function Home() {
 
     // TABS
     React.createElement('div',{style:{display:'flex',background:'#111827',borderBottom:'1px solid #1e2d45',overflowX:'auto',WebkitOverflowScrolling:'touch'}},
-      [['scanner','Scanner (N500)'],['analyze','Analyze Stock'],['adwatch','AD Watch'],['trades','Trades'],['validate','Validate']].map(function(tabItem){
+      [['scanner','Scanner'],['analyze','Analyze'],['backtest','Backtest'],['adwatch','AD Watch'],['trades','Trades'],['validate','Validate']].map(function(tabItem){
         var t=tabItem[0]; var label=tabItem[1];
         const active=tab===t;
         return React.createElement('button',{key:t,onClick:()=>setTab(t),style:{flex:'0 0 auto',padding:'10px 10px',background:'transparent',border:'none',borderBottom:active?'2px solid '+G:'2px solid transparent',color:active?G:'#4a6080',fontSize:10,fontWeight:active?700:400,cursor:'pointer',textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:'monospace',whiteSpace:'nowrap'}},label);
